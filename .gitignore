@@ -10,3 +10,6 @@
 \.idea/vcs\.xml
 
 \.idea/workspace\.xml
+.vscode/launch.json
+hw1/debug
+hw1/debug.test
