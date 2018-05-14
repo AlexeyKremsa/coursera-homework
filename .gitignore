@@ -13,3 +13,7 @@
 .vscode/launch.json
 hw1/debug
 hw1/debug.test
+
+\.idea/watcherTasks\.xml
+
+hw1/handlers_gen/handlers_gen
