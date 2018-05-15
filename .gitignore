@@ -1,19 +1,11 @@
 
 \.DS_Store
 
-\.idea/coursera-homework\.iml
+\.idea*
 
-\.idea/misc\.xml
-
-\.idea/modules\.xml
-
-\.idea/vcs\.xml
-
-\.idea/workspace\.xml
 .vscode/launch.json
 hw1/debug
 hw1/debug.test
 
-\.idea/watcherTasks\.xml
 
 hw1/handlers_gen/handlers_gen

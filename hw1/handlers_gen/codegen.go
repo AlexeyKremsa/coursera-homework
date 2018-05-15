@@ -6,15 +6,76 @@ import (
 	"go/parser"
 	"go/token"
 	"log"
+	"os"
 	"reflect"
 )
 
+type tpl struct {
+	StructName string
+	URLs       []string
+}
+
+const (
+	imports string = `import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strconv"
+)`
+
+	response = `
+type response struct {
+	Error    string      "json:'error'"
+	Response interface{} "json:'response,omitempty'"
+}
+
+func writeResponseJSON(w http.ResponseWriter, status int, data interface{}, errorText string) {
+	w.Header().Set("Content-Type", "application/json")
+	resp := response{
+		Error:    errorText,
+		Response: data,
+	}
+
+	jsonResp, err := json.Marshal(resp)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, err.Error())
+	} else {
+		w.WriteHeader(status)
+		w.Write(jsonResp)
+	}
+}`
+
+	//TODO: finish it
+	serveHttpTmpl = `
+func (api *{{.StructName}}) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	switch r.URL.Path {
+	case "/user/profile":
+		api.wrapperProfile(w, r)
+	case "/user/create":
+		api.wrapperCreate(w, r)
+	default:
+		writeResponseJSON(w, http.StatusNotFound, nil, "unknown method")
+	}
+}`
+)
+
 func main() {
+	out, err := os.Create("../api_generated.go")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, "../api.go", nil, parser.ParseComments)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	fmt.Fprintln(out, `package `+node.Name.Name)
+	fmt.Fprintln(out) // empty line
+	fmt.Fprintln(out, imports)
+	fmt.Fprintln(out, response)
 
 	for _, f := range node.Decls {
 		g, ok := f.(*ast.GenDecl)
