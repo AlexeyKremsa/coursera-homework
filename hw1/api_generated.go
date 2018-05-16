@@ -28,3 +28,5 @@ func writeResponseJSON(w http.ResponseWriter, status int, data interface{}, erro
 		w.Write(jsonResp)
 	}
 }
+
+func (api *
