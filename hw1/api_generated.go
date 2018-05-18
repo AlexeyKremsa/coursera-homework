@@ -29,4 +29,21 @@ func writeResponseJSON(w http.ResponseWriter, status int, data interface{}, erro
 	}
 }
 
-func (api *
+func (api *OtherApi) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	switch r.URL.Path { 
+	case "/user/create":
+		api.wrapperCreate(w, r)
+	default:
+		writeResponseJSON(w, http.StatusNotFound, nil, "unknown method")
+	}
+}
+func (api *MyApi) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	switch r.URL.Path { 
+	case "/user/profile":
+		api.wrapperProfile(w, r)
+	case "/user/create":
+		api.wrapperCreate(w, r)
+	default:
+		writeResponseJSON(w, http.StatusNotFound, nil, "unknown method")
+	}
+}

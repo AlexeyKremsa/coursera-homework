@@ -44,9 +44,16 @@ func writeResponseJSON(w http.ResponseWriter, status int, data interface{}, erro
 }`
 )
 
-type tmpl struct {
-	Handlers []handlerTmpl
+func init() {
+	structHandlers = make(map[string][]handlerTmpl)
 }
+
+type serveHttpTmplModel struct {
+	StructName string
+	Handlers   []handlerTmpl
+}
+
+var structHandlers map[string][]handlerTmpl
 
 type handlerTmpl struct {
 	HandlerName  string
@@ -56,14 +63,12 @@ type handlerTmpl struct {
 	IsProtected  bool
 }
 
-// TODO: FIX TEMPLATE
 var serveHttpTmpl = template.Must(template.New("serveHttpTmpl").Parse(`
 func (api *{{.StructName}}) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	switch r.URL.Path {
-{{if .Handlers -}}
+	switch r.URL.Path { {{if .Handlers -}}
 	{{- range .Handlers}}
 	case "{{.URL}}":
-		api.wrapper{{.Name}}(w, r)
+		api.wrapper{{.HandlerName}}(w, r)
 	{{- end}}
 {{- end}}
 	default:
@@ -87,8 +92,6 @@ func main() {
 	fmt.Fprintln(out) // empty line
 	fmt.Fprintln(out, imports)
 	fmt.Fprintln(out, response)
-
-	handlerTmpls := make([]handlerTmpl, 0)
 
 	// Show output
 	//for _, f := range node.Decls {
@@ -149,12 +152,18 @@ func main() {
 				h.HandlerName = fn.Name.Name
 				h.ReceiverType = str
 				h.URL = apigen.URL
+				h.Method = apigen.Method
+				h.IsProtected = apigen.Auth
 
-				handlerTmpls = append(handlerTmpls, h)
-
-				fmt.Printf("Func name: %s\n", fn.Name.Name)
-				fmt.Println("Receiver type: ", str)
-				fmt.Println("Receiver name: ", r.Names[0].String())
+				handlers, ok := structHandlers[str]
+				if ok {
+					handlers = append(handlers, h)
+					structHandlers[str] = handlers
+				} else {
+					handlers = make([]handlerTmpl, 1)
+					handlers[0] = h
+					structHandlers[str] = handlers
+				}
 			}
 		}
 
@@ -169,12 +178,16 @@ func main() {
 		//fmt.Println(fn.Doc.Text())
 	}
 
-	tmpl := tmpl{
-		Handlers: handlerTmpls,
-	}
-	err = serveHttpTmpl.Execute(out, tmpl)
-	if err != nil {
-		log.Fatal(err)
+	for k, v := range structHandlers {
+		model := serveHttpTmplModel{
+			StructName: k,
+			Handlers:   v,
+		}
+
+		err = serveHttpTmpl.Execute(out, model)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 }
 
