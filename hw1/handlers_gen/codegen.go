@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"log"
 	"os"
+	"reflect"
 	"strings"
 )
 
@@ -44,16 +45,24 @@ func writeResponseJSON(w http.ResponseWriter, status int, data interface{}, erro
 }`
 )
 
+var structHandlers map[string][]handlerTmpl
+var structFields map[string][]Field
+
 func init() {
 	structHandlers = make(map[string][]handlerTmpl)
+	structFields = make(map[string][]Field)
+}
+
+type Field struct {
+	Name string
+	Type string
+	Tag  string
 }
 
 type serveHttpTmplModel struct {
 	StructName string
 	Handlers   []handlerTmpl
 }
-
-var structHandlers map[string][]handlerTmpl
 
 type handlerTmpl struct {
 	HandlerName  string
@@ -63,12 +72,18 @@ type handlerTmpl struct {
 	IsProtected  bool
 }
 
+type ApigenComment struct {
+	URL    string `json:"url"`
+	Auth   bool   `json:"auth"`
+	Method string `json:"method"`
+}
+
 var serveHttpTmpl = template.Must(template.New("serveHttpTmpl").Parse(`
-func (api *{{.StructName}}) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (srv *{{.StructName}}) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path { {{if .Handlers -}}
 	{{- range .Handlers}}
 	case "{{.URL}}":
-		api.wrapper{{.HandlerName}}(w, r)
+		srv.wrapper{{.HandlerName}}(w, r)
 	{{- end}}
 {{- end}}
 	default:
@@ -94,38 +109,43 @@ func main() {
 	fmt.Fprintln(out, response)
 
 	// Show output
-	//for _, f := range node.Decls {
-	//	g, ok := f.(*ast.GenDecl)
-	//	if !ok {
-	//		continue
-	//	}
-	//
-	//	for _, spec := range g.Specs {
-	//		currType, ok := spec.(*ast.TypeSpec)
-	//		if !ok {
-	//			continue
-	//		}
-	//
-	//		fmt.Printf("Struct name: %s\n", currType.Name)
-	//
-	//		currStruct, ok := currType.Type.(*ast.StructType)
-	//		if !ok {
-	//			continue
-	//		}
-	//
-	//		for _, field := range currStruct.Fields.List {
-	//
-	//			if field.Tag != nil {
-	//				tag := reflect.StructTag(field.Tag.Value[1 : len(field.Tag.Value)-1])
-	//				if tag.Get("apivalidator") == "-" {
-	//					continue
-	//				}
-	//
-	//				fmt.Printf("fieldName: %s, tag: %s\n", field.Names[0].Name, tag)
-	//			}
-	//		}
-	//	}
-	//}
+	for _, f := range node.Decls {
+		g, ok := f.(*ast.GenDecl)
+		if !ok {
+			continue
+		}
+
+		for _, spec := range g.Specs {
+			currType, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+
+			currStruct, ok := currType.Type.(*ast.StructType)
+			if !ok {
+				continue
+			}
+
+			fields := make([]Field, 0)
+
+			for _, field := range currStruct.Fields.List {
+				if field.Tag != nil {
+					tag := reflect.StructTag(field.Tag.Value[1 : len(field.Tag.Value)-1])
+					if tag.Get("apivalidator") == "-" {
+						continue
+					}
+
+					f := Field{
+						Name: field.Names[0].Name,
+						Type: fmt.Sprint(field.Type),
+						Tag:  fmt.Sprint(tag),
+					}
+					fields = append(fields, f)
+					fmt.Printf("fieldName: %s, type: %s, tag: %s\n", field.Names[0].Name, fmt.Sprint(field.Type), fmt.Sprint(tag))
+				}
+			}
+		}
+	}
 
 	for _, f := range node.Decls {
 		fn, ok := f.(*ast.FuncDecl)
@@ -137,44 +157,44 @@ func main() {
 			continue
 		} else {
 			for _, r := range fn.Recv.List {
-				str := parseReceiverType(fmt.Sprint(r.Type))
-				if str == "ApiError" || str == "" {
+				receiver := parseReceiverType(fmt.Sprint(r.Type))
+				if receiver == "ApiError" || receiver == "" {
 					continue
 				}
 
 				apigen, err := parseApigenComment(fn.Doc.Text())
 				if err != nil {
-					log.Println("Unknown tag: ", apigen)
+					log.Println("Unknown handler tag: ", apigen)
 					continue
 				}
 
 				h := handlerTmpl{}
 				h.HandlerName = fn.Name.Name
-				h.ReceiverType = str
+				h.ReceiverType = receiver
 				h.URL = apigen.URL
 				h.Method = apigen.Method
 				h.IsProtected = apigen.Auth
 
-				handlers, ok := structHandlers[str]
+				handlers, ok := structHandlers[receiver]
 				if ok {
 					handlers = append(handlers, h)
-					structHandlers[str] = handlers
+					structHandlers[receiver] = handlers
 				} else {
 					handlers = make([]handlerTmpl, 1)
 					handlers[0] = h
-					structHandlers[str] = handlers
+					structHandlers[receiver] = handlers
 				}
 			}
 		}
 
-		//for _, p := range fn.Type.Params.List {
-		//	for _, n := range p.Names {
-		//		fmt.Printf("Name: %s\n", n.Name)
-		//	}
-		//
-		//	fmt.Println("Type: ", p.Type)
-		//}
-		//
+		for _, p := range fn.Type.Params.List {
+			for _, n := range p.Names {
+				fmt.Printf("Name: %s\n", n.Name)
+			}
+
+			fmt.Println("Type: ", p.Type)
+		}
+
 		//fmt.Println(fn.Doc.Text())
 	}
 
@@ -201,12 +221,6 @@ func parseReceiverType(name string) string {
 	lastElem = strings.TrimRight(lastElem, "}")
 
 	return lastElem
-}
-
-type ApigenComment struct {
-	URL    string `json:"url"`
-	Auth   bool   `json:"auth"`
-	Method string `json:"method"`
 }
 
 func parseApigenComment(comment string) (*ApigenComment, error) {
