@@ -6,43 +6,10 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"html/template"
 	"log"
 	"os"
 	"reflect"
 	"strings"
-)
-
-const (
-	imports string = `import (
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"strconv"
-)`
-
-	response = `
-type response struct {
-	Error    string      "json:'error'"
-	Response interface{} "json:'response,omitempty'"
-}
-
-func writeResponseJSON(w http.ResponseWriter, status int, data interface{}, errorText string) {
-	w.Header().Set("Content-Type", "application/json")
-	resp := response{
-		Error:    errorText,
-		Response: data,
-	}
-
-	jsonResp, err := json.Marshal(resp)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprint(w, err.Error())
-	} else {
-		w.WriteHeader(status)
-		w.Write(jsonResp)
-	}
-}`
 )
 
 var structHandlers map[string][]handlerTmpl
@@ -51,6 +18,10 @@ var structFields map[string][]Field
 func init() {
 	structHandlers = make(map[string][]handlerTmpl)
 	structFields = make(map[string][]Field)
+}
+
+type Fields struct {
+	Fields []Field
 }
 
 type Field struct {
@@ -78,19 +49,6 @@ type ApigenComment struct {
 	Method string `json:"method"`
 }
 
-var serveHttpTmpl = template.Must(template.New("serveHttpTmpl").Parse(`
-func (srv *{{.StructName}}) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	switch r.URL.Path { {{if .Handlers -}}
-	{{- range .Handlers}}
-	case "{{.URL}}":
-		srv.wrapper{{.HandlerName}}(w, r)
-	{{- end}}
-{{- end}}
-	default:
-		writeResponseJSON(w, http.StatusNotFound, nil, "unknown method")
-	}
-}`))
-
 func main() {
 	out, err := os.Create("../api_generated.go")
 	if err != nil {
@@ -108,7 +66,7 @@ func main() {
 	fmt.Fprintln(out, imports)
 	fmt.Fprintln(out, response)
 
-	// Show output
+	// Parse structs
 	for _, f := range node.Decls {
 		g, ok := f.(*ast.GenDecl)
 		if !ok {
@@ -127,29 +85,39 @@ func main() {
 			}
 
 			fields := make([]Field, 0)
-
+			fmt.Println(currType.Name)
 			for _, field := range currStruct.Fields.List {
+				var tag string
 				if field.Tag != nil {
-					tag := reflect.StructTag(field.Tag.Value[1 : len(field.Tag.Value)-1])
-					if tag.Get("apivalidator") == "-" {
-						continue
-					}
-
-					f := Field{
-						Name: field.Names[0].Name,
-						Type: fmt.Sprint(field.Type),
-						Tag:  fmt.Sprint(tag),
-					}
-					fields = append(fields, f)
-					fmt.Printf("fieldName: %s, type: %s, tag: %s\n", field.Names[0].Name, fmt.Sprint(field.Type), fmt.Sprint(tag))
+					tag = fmt.Sprint(reflect.StructTag(field.Tag.Value[1 : len(field.Tag.Value)-1]))
 				}
+				// if tag.Get("apivalidator") == "" {
+				// 	continue
+				// }
+
+				f := Field{
+					Name: field.Names[0].Name,
+					Type: fmt.Sprint(field.Type),
+					Tag:  tag,
+				}
+				fields = append(fields, f)
+				fmt.Printf("fieldName: %s, type: %s, tag: %s\n", field.Names[0].Name, fmt.Sprint(field.Type), tag)
 			}
+
+			structFields[fmt.Sprint(currType.Name)] = fields
 		}
 	}
 
+	// Parse func declarations
 	for _, f := range node.Decls {
 		fn, ok := f.(*ast.FuncDecl)
 		if !ok {
+			continue
+		}
+
+		apigen, err := parseApigenComment(fn.Doc.Text())
+		if err != nil {
+			log.Println("Unknown handler tag: ", apigen)
 			continue
 		}
 
@@ -159,12 +127,7 @@ func main() {
 			for _, r := range fn.Recv.List {
 				receiver := parseReceiverType(fmt.Sprint(r.Type))
 				if receiver == "ApiError" || receiver == "" {
-					continue
-				}
-
-				apigen, err := parseApigenComment(fn.Doc.Text())
-				if err != nil {
-					log.Println("Unknown handler tag: ", apigen)
+					log.Println("Receiver is ApiError or empty. Going to be skipped...")
 					continue
 				}
 
@@ -184,20 +147,56 @@ func main() {
 					handlers[0] = h
 					structHandlers[receiver] = handlers
 				}
+
+				// 1. Declare a function
+				err = funcDeclarationTmpl.Execute(out, h)
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				// 2. Check if request method is allowed
+				checkRequestMethodTmpl(out, h.Method)
+
+				fmt.Fprintln(out) // empty line
+
+				// for _, p := range fn.Type.Params.List {
+				// 	fmt.Println("Type: ", p.Type)
+				// 	fmt.Println("Func name: ", fn.Name.Name)
+				// }
+
+				// fields, ok := structFields[h.ReceiverType]
+				// if !ok || len(fields) == 0 {
+				// 	log.Println("Can't declare fields for type: ", h.ReceiverType)
+				// 	continue
+				// }
+				// declareParams(out, fields)
+				// fmt.Fprintln(out) // empty line
 			}
 		}
 
+		// 3. Declare necessary fields
 		for _, p := range fn.Type.Params.List {
-			for _, n := range p.Names {
-				fmt.Printf("Name: %s\n", n.Name)
+			fmt.Println("Type: ", p.Type)
+			fmt.Println("Func name: ", fn.Name.Name)
+
+			argType := fmt.Sprint(p.Type)
+			if argType == "&{context Context}" {
+				continue
 			}
 
-			fmt.Println("Type: ", p.Type)
+			fields, ok := structFields[argType]
+			if !ok {
+				log.Println("Can't find fields for type: ", argType)
+				continue
+			}
+
+			declareParams(out, fields)
 		}
 
-		//fmt.Println(fn.Doc.Text())
+		fmt.Fprintln(out) // empty line
 	}
 
+	// Generate ServeHttp
 	for k, v := range structHandlers {
 		model := serveHttpTmplModel{
 			StructName: k,
@@ -208,6 +207,15 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+
+		// for _, h := range v {
+		// 	err := funcDeclarationTmpl.Execute(out, h)
+		// 	if err != nil {
+		// 		log.Fatal(err)
+		// 	}
+		// }
+
+		fmt.Fprintln(out) // empty line
 	}
 }
 

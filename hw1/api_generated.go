@@ -29,21 +29,49 @@ func writeResponseJSON(w http.ResponseWriter, status int, data interface{}, erro
 	}
 }
 
-func (api *MyApi) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
+func (srv *MyApi) wrapperProfile(w http.ResponseWriter, r *http.Request) {
+
+	var Login string
+
+func (srv *MyApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {	
+		if r.Method != http.MethodPost {
+			writeResponseJSON(w, http.StatusNotAcceptable, nil, "bad method")
+			return
+		}
+
+	var Login string
+	var Name string
+	var Status string
+	var Age int
+
+func (srv *OtherApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {	
+		if r.Method != http.MethodPost {
+			writeResponseJSON(w, http.StatusNotAcceptable, nil, "bad method")
+			return
+		}
+
+	var Username string
+	var Name string
+	var Class string
+	var Level int
+
+func (srv *MyApi) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path { 
-	case "/user/profile":
-		api.wrapperProfile(w, r)
-	case "/user/create":
-		api.wrapperCreate(w, r)
-	default:
-		writeResponseJSON(w, http.StatusNotFound, nil, "unknown method")
+		case "/user/profile":
+			srv.wrapperProfile(w, r)
+		case "/user/create":
+			srv.wrapperCreate(w, r)
+		default:
+			writeResponseJSON(w, http.StatusNotFound, nil, "unknown method")
+		}
 	}
-}
-func (api *OtherApi) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
+func (srv *OtherApi) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path { 
-	case "/user/create":
-		api.wrapperCreate(w, r)
-	default:
-		writeResponseJSON(w, http.StatusNotFound, nil, "unknown method")
+		case "/user/create":
+			srv.wrapperCreate(w, r)
+		default:
+			writeResponseJSON(w, http.StatusNotFound, nil, "unknown method")
+		}
 	}
-}
