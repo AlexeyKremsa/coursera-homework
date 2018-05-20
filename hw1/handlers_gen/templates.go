@@ -100,7 +100,13 @@ func declareParams(out *os.File, fields []Field) {
 // 	for _, field := range fields {
 // 		switch httpMethod {
 // 		case "GET":
+// 			fmt.Fprint(out, `if r.Method == http.MethodGet {`)
+// 			for _, f := range fields {
+// 				if f.Tag == "" {
+// 					fmt.Fprintf(out, `%s = r.URL.Query().Get("%s")`, f.Name, f.Name)
+// 				}
 
+// 			}
 // 		default:
 // 			log.Fatal("Unsupported http method: ", httpMethod)
 // 		}

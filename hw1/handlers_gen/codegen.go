@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -9,7 +8,6 @@ import (
 	"log"
 	"os"
 	"reflect"
-	"strings"
 )
 
 var structHandlers map[string][]handlerTmpl
@@ -18,6 +16,23 @@ var structFields map[string][]Field
 func init() {
 	structHandlers = make(map[string][]handlerTmpl)
 	structFields = make(map[string][]Field)
+}
+
+type ApivalidatorInt struct {
+	Required  bool
+	ParamName string
+	Min       int
+	Max       int
+	Default   int
+}
+
+type ApiValidatorString struct {
+	Required  bool
+	ParamName string
+	Min       int
+	Max       int
+	Default   string
+	Enum      []string
 }
 
 type Fields struct {
@@ -217,35 +232,4 @@ func main() {
 
 		fmt.Fprintln(out) // empty line
 	}
-}
-
-func parseReceiverType(name string) string {
-	splittedArr := strings.Split(name, " ")
-	if len(splittedArr) == 0 {
-		return ""
-	}
-
-	lastElem := splittedArr[len(splittedArr)-1]
-	lastElem = strings.TrimRight(lastElem, "}")
-
-	return lastElem
-}
-
-func parseApigenComment(comment string) (*ApigenComment, error) {
-	start := strings.Index(comment, "{")
-	end := strings.Index(comment, "}")
-	finalStr := comment[start : end+1]
-
-	tag := strings.TrimSpace(comment[:start])
-	if tag != "apigen:api" {
-		return nil, fmt.Errorf("unknown tag: %s", tag)
-	}
-
-	apigen := &ApigenComment{}
-	err := json.Unmarshal([]byte(finalStr), apigen)
-	if err != nil {
-		return nil, err
-	}
-
-	return apigen, nil
 }
