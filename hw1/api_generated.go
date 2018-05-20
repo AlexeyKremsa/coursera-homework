@@ -29,32 +29,59 @@ func writeResponseJSON(w http.ResponseWriter, status int, data interface{}, erro
 	}
 }
 
-
 func (srv *MyApi) wrapperProfile(w http.ResponseWriter, r *http.Request) {
 
-	var Login string
+	var login string
+
+if r.Method == http.MethodGet {
+login = r.URL.Query().Get(`login`)
+}
+
+if r.Method == http.MethodPost {
+login = r.FormValue(`login`)
+}
+
+
 
 func (srv *MyApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {	
-		if r.Method != http.MethodPost {
-			writeResponseJSON(w, http.StatusNotAcceptable, nil, "bad method")
-			return
-		}
+	if r.Method != http.MethodPost {
+		writeResponseJSON(w, http.StatusNotAcceptable, nil, "bad method")
+		return
+	}
 
-	var Login string
-	var Name string
-	var Status string
-	var Age int
+	var login string
+	var name string
+	var status string
+	var age int
+
+if r.Method == http.MethodPost {
+login = r.FormValue(`login`)
+name = r.FormValue(`full_name`)
+status = r.FormValue(`status`)
+age = r.FormValue(`age`)
+}
+
+
 
 func (srv *OtherApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {	
-		if r.Method != http.MethodPost {
-			writeResponseJSON(w, http.StatusNotAcceptable, nil, "bad method")
-			return
-		}
+	if r.Method != http.MethodPost {
+		writeResponseJSON(w, http.StatusNotAcceptable, nil, "bad method")
+		return
+	}
 
-	var Username string
-	var Name string
-	var Class string
-	var Level int
+	var username string
+	var name string
+	var class string
+	var level int
+
+if r.Method == http.MethodPost {
+username = r.FormValue(`username`)
+name = r.FormValue(`account_name`)
+class = r.FormValue(`class`)
+level = r.FormValue(`level`)
+}
+
+
 
 func (srv *MyApi) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path { 

@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"strings"
 )
 
 var structHandlers map[string][]handlerTmpl
@@ -111,7 +112,7 @@ func main() {
 				// }
 
 				f := Field{
-					Name: field.Names[0].Name,
+					Name: strings.ToLower(field.Names[0].Name),
 					Type: fmt.Sprint(field.Type),
 					Tag:  tag,
 				}
@@ -127,6 +128,10 @@ func main() {
 	for _, f := range node.Decls {
 		fn, ok := f.(*ast.FuncDecl)
 		if !ok {
+			continue
+		}
+
+		if fn.Doc.Text() == "" {
 			continue
 		}
 
@@ -172,8 +177,6 @@ func main() {
 				// 2. Check if request method is allowed
 				checkRequestMethodTmpl(out, h.Method)
 
-				fmt.Fprintln(out) // empty line
-
 				// for _, p := range fn.Type.Params.List {
 				// 	fmt.Println("Type: ", p.Type)
 				// 	fmt.Println("Func name: ", fn.Name.Name)
@@ -186,29 +189,32 @@ func main() {
 				// }
 				// declareParams(out, fields)
 				// fmt.Fprintln(out) // empty line
+
+				// 3. Declare necessary fields
+				for _, p := range fn.Type.Params.List {
+					fmt.Println("Type: ", p.Type)
+					fmt.Println("Func name: ", fn.Name.Name)
+
+					argType := fmt.Sprint(p.Type)
+					if argType == "&{context Context}" {
+						continue
+					}
+
+					fields, ok := structFields[argType]
+					if !ok {
+						log.Println("Can't find fields for type: ", argType)
+						continue
+					}
+
+					declareParams(out, fields)
+					readParams(out, fields, h.Method)
+				}
+
+				fmt.Fprintln(out) // empty line
 			}
+
 		}
 
-		// 3. Declare necessary fields
-		for _, p := range fn.Type.Params.List {
-			fmt.Println("Type: ", p.Type)
-			fmt.Println("Func name: ", fn.Name.Name)
-
-			argType := fmt.Sprint(p.Type)
-			if argType == "&{context Context}" {
-				continue
-			}
-
-			fields, ok := structFields[argType]
-			if !ok {
-				log.Println("Can't find fields for type: ", argType)
-				continue
-			}
-
-			declareParams(out, fields)
-		}
-
-		fmt.Fprintln(out) // empty line
 	}
 
 	// Generate ServeHttp

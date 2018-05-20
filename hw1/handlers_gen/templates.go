@@ -58,6 +58,9 @@ var declareParamsTmpl = template.Must(template.New("declareParamsTmpl").Parse(`
 	var {{.Name}} {{.Type}}
 	{{- end}}`))
 
+var getFromQueryParam = "%s = r.URL.Query().Get(`%s`)\n"
+var getFromForm = "%s = r.FormValue(`%s`)\n"
+
 func checkRequestMethodTmpl(out *os.File, allowedMethod string) {
 	// Both POST and GET allowed
 	if allowedMethod == "" {
@@ -66,22 +69,24 @@ func checkRequestMethodTmpl(out *os.File, allowedMethod string) {
 
 	if allowedMethod == "GET" {
 		fmt.Fprint(out, `
-		if r.Method != http.MethodGet {
-			writeResponseJSON(w, http.StatusNotAcceptable, nil, "bad method")
-			return
-		}`)
+	if r.Method != http.MethodGet {
+		writeResponseJSON(w, http.StatusNotAcceptable, nil, "bad method")
+		return
+	}`)
 	}
 
 	if allowedMethod == "POST" {
 		fmt.Fprint(out, `	
-		if r.Method != http.MethodPost {
-			writeResponseJSON(w, http.StatusNotAcceptable, nil, "bad method")
-			return
-		}`)
+	if r.Method != http.MethodPost {
+		writeResponseJSON(w, http.StatusNotAcceptable, nil, "bad method")
+		return
+	}`)
 	}
 }
 
 func declareParams(out *os.File, fields []Field) {
+	fmt.Fprintln(out)
+
 	if len(fields) == 0 {
 		log.Fatal("There are no fields to read")
 	}
@@ -94,21 +99,98 @@ func declareParams(out *os.File, fields []Field) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	fmt.Fprintln(out)
 }
 
-// func readParams(out *os.File, fields []Field, httpMethod string) {
-// 	for _, field := range fields {
-// 		switch httpMethod {
-// 		case "GET":
-// 			fmt.Fprint(out, `if r.Method == http.MethodGet {`)
-// 			for _, f := range fields {
-// 				if f.Tag == "" {
-// 					fmt.Fprintf(out, `%s = r.URL.Query().Get("%s")`, f.Name, f.Name)
-// 				}
+func readParams(out *os.File, fields []Field, httpMethod string) {
+	fmt.Fprintln(out)
+	switch httpMethod {
+	case "GET":
+		readParamsGet(out, fields)
+	case "POST":
+		readParamsPost(out, fields)
 
-// 			}
-// 		default:
-// 			log.Fatal("Unsupported http method: ", httpMethod)
-// 		}
-// 	}
-// }
+	default:
+		// Decalare for post and get methods
+		readParamsGet(out, fields)
+		readParamsPost(out, fields)
+	}
+}
+
+func readParamsGet(out *os.File, fields []Field) {
+	fmt.Fprintln(out, `if r.Method == http.MethodGet {`)
+	for _, f := range fields {
+		if f.Tag == "" {
+			fmt.Fprintf(out, getFromQueryParam, f.Name, f.Name)
+		}
+
+		if f.Type == "int" {
+			tags, err := parseApivalidatorInt(f.Tag)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			if tags.ParamName != "" {
+				fmt.Fprintf(out, getFromQueryParam, f.Name, tags.ParamName)
+			} else {
+				fmt.Fprintf(out, getFromQueryParam, f.Name, f.Name)
+			}
+
+		}
+
+		if f.Type == "string" {
+			tags, err := parseApivalidatorString(f.Tag)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			if tags.ParamName != "" {
+				fmt.Fprintf(out, getFromQueryParam, f.Name, tags.ParamName)
+			} else {
+				fmt.Fprintf(out, getFromQueryParam, f.Name, f.Name)
+			}
+		}
+	}
+
+	fmt.Fprintln(out, "}")
+	fmt.Fprintln(out)
+}
+
+func readParamsPost(out *os.File, fields []Field) {
+	fmt.Fprintln(out, `if r.Method == http.MethodPost {`)
+	for _, f := range fields {
+		if f.Tag == "" {
+			fmt.Fprintf(out, getFromForm, f.Name, f.Name)
+		}
+
+		if f.Type == "int" {
+			tags, err := parseApivalidatorInt(f.Tag)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			if tags.ParamName != "" {
+				fmt.Fprintf(out, getFromForm, f.Name, tags.ParamName)
+			} else {
+				fmt.Fprintf(out, getFromForm, f.Name, f.Name)
+			}
+		}
+
+		if f.Type == "string" {
+			tags, err := parseApivalidatorString(f.Tag)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			if tags.ParamName != "" {
+				fmt.Fprintf(out, getFromForm, f.Name, tags.ParamName)
+			} else {
+				fmt.Fprintf(out, getFromForm, f.Name, f.Name)
+			}
+		}
+	}
+
+	fmt.Fprintln(out, "}")
+	fmt.Fprintln(out)
+}
