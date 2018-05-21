@@ -33,14 +33,21 @@ func (srv *MyApi) wrapperProfile(w http.ResponseWriter, r *http.Request) {
 
 	var login string
 
-if r.Method == http.MethodGet {
-login = r.URL.Query().Get(`login`)
-}
 
-if r.Method == http.MethodPost {
-login = r.FormValue(`login`)
-}
+	if r.Method == http.MethodGet {
+       login = r.URL.Query().Get(`login`)
+    }
 
+
+	if r.Method == http.MethodPost {
+       login = r.FormValue(`login`)
+    }
+
+
+	if login == "" {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "login must me not empty")
+		return
+	}
 
 
 func (srv *MyApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {	
@@ -54,13 +61,19 @@ func (srv *MyApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
 	var status string
 	var age int
 
-if r.Method == http.MethodPost {
-login = r.FormValue(`login`)
-name = r.FormValue(`full_name`)
-status = r.FormValue(`status`)
-age = r.FormValue(`age`)
-}
 
+	if r.Method == http.MethodPost {
+       login = r.FormValue(`login`)
+       name = r.FormValue(`full_name`)
+       status = r.FormValue(`status`)
+       age = r.FormValue(`age`)
+    }
+
+
+	if login == "" {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "login must me not empty")
+		return
+	}
 
 
 func (srv *OtherApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {	
@@ -74,13 +87,19 @@ func (srv *OtherApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
 	var class string
 	var level int
 
-if r.Method == http.MethodPost {
-username = r.FormValue(`username`)
-name = r.FormValue(`account_name`)
-class = r.FormValue(`class`)
-level = r.FormValue(`level`)
-}
 
+	if r.Method == http.MethodPost {
+       username = r.FormValue(`username`)
+       name = r.FormValue(`account_name`)
+       class = r.FormValue(`class`)
+       level = r.FormValue(`level`)
+    }
+
+
+	if username == "" {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "username must me not empty")
+		return
+	}
 
 
 func (srv *MyApi) ServeHTTP(w http.ResponseWriter, r *http.Request) {

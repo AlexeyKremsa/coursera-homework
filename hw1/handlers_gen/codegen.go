@@ -13,10 +13,12 @@ import (
 
 var structHandlers map[string][]handlerTmpl
 var structFields map[string][]Field
+var fieldApivalidatorTags map[string]*ApiValidatorTags
 
 func init() {
 	structHandlers = make(map[string][]handlerTmpl)
 	structFields = make(map[string][]Field)
+	fieldApivalidatorTags = make(map[string]*ApiValidatorTags)
 }
 
 type ApiValidatorTags struct {
@@ -205,7 +207,7 @@ func main() {
 					readParams(out, fields, h.Method)
 
 					// 5. Validate params according to rules specified in tags
-
+					validateParams(out, fields)
 				}
 
 				fmt.Fprintln(out) // empty line

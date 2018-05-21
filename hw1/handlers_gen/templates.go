@@ -58,8 +58,11 @@ var declareParamsTmpl = template.Must(template.New("declareParamsTmpl").Parse(`
 	var {{.Name}} {{.Type}}
 	{{- end}}`))
 
-var getFromQueryParam = "%s = r.URL.Query().Get(`%s`)\n"
-var getFromForm = "%s = r.FormValue(`%s`)\n"
+//var ifStatementTmpl = template.Must(template.New("ifStatementTmpl").Parse(`
+//	if .Name == .Value {`))
+
+var getFromQueryParam = "       %s = r.URL.Query().Get(`%s`)\n"
+var getFromForm = "       %s = r.FormValue(`%s`)\n"
 
 func checkRequestMethodTmpl(out *os.File, allowedMethod string) {
 	// Both POST and GET allowed
@@ -105,24 +108,34 @@ func declareParams(out *os.File, fields []Field) {
 
 func readParams(out *os.File, fields []Field, httpMethod string) {
 	fmt.Fprintln(out)
+
+	if httpMethod == "" {
+		readParamsTmpl(out, fields, "GET")
+		readParamsTmpl(out, fields, "POST")
+	} else {
+		readParamsTmpl(out, fields, httpMethod)
+	}
+}
+
+func readParamsTmpl(out *os.File, fields []Field, httpMethod string) {
+	var getParamFrom string
 	switch httpMethod {
 	case "GET":
-		readParamsGet(out, fields)
+		fmt.Fprintln(out, `
+	if r.Method == http.MethodGet {`)
+		getParamFrom = getFromQueryParam
 	case "POST":
-		readParamsPost(out, fields)
-
+		fmt.Fprintln(out, `
+	if r.Method == http.MethodPost {`)
+		getParamFrom = getFromForm
 	default:
-		// Declare variables for post and get methods
-		readParamsGet(out, fields)
-		readParamsPost(out, fields)
+		log.Fatal("unsupported http method: ", httpMethod)
 	}
-}
 
-func readParamsGet(out *os.File, fields []Field) {
-	fmt.Fprintln(out, `if r.Method == http.MethodGet {`)
 	for _, f := range fields {
 		if f.Tag == "" {
-			fmt.Fprintf(out, getFromQueryParam, f.Name, f.Name)
+			fmt.Fprintf(out, getParamFrom, f.Name, f.Name)
+			continue
 		}
 
 		tags, err := parseApivalidatorTags(f.Type, f.Tag)
@@ -130,37 +143,18 @@ func readParamsGet(out *os.File, fields []Field) {
 			log.Fatal(err)
 		}
 
+		// we can reuse tags without parsing them again
+		// this approach is used to avoid validation code duplicate for post and get methods
+		fieldApivalidatorTags[f.Name] = tags
+
 		if tags.ParamName != "" {
-			fmt.Fprintf(out, getFromQueryParam, f.Name, tags.ParamName)
+			fmt.Fprintf(out, getParamFrom, f.Name, tags.ParamName)
 		} else {
-			fmt.Fprintf(out, getFromQueryParam, f.Name, f.Name)
+			fmt.Fprintf(out, getParamFrom, f.Name, f.Name)
 		}
 	}
 
-	fmt.Fprintln(out, "}")
-	fmt.Fprintln(out)
-}
-
-func readParamsPost(out *os.File, fields []Field) {
-	fmt.Fprintln(out, `if r.Method == http.MethodPost {`)
-	for _, f := range fields {
-		if f.Tag == "" {
-			fmt.Fprintf(out, getFromForm, f.Name, f.Name)
-		}
-
-		tags, err := parseApivalidatorTags(f.Type, f.Tag)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		if tags.ParamName != "" {
-			fmt.Fprintf(out, getFromForm, f.Name, tags.ParamName)
-		} else {
-			fmt.Fprintf(out, getFromForm, f.Name, f.Name)
-		}
-	}
-
-	fmt.Fprintln(out, "}")
+	fmt.Fprintln(out, "    }")
 	fmt.Fprintln(out)
 }
 
@@ -170,5 +164,20 @@ func validateParams(out *os.File, fields []Field) {
 			continue
 		}
 
+		tags, ok := fieldApivalidatorTags[f.Name]
+		if !ok {
+			log.Println("Can't find apivalidator tag for field: ", f.Name)
+			continue
+		}
+
+		if tags.Required {
+			requiredTmpl := fmt.Sprintf(`
+	if %s == "" {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "%s must me not empty")
+		return
+	}`, f.Name, f.Name)
+
+			fmt.Fprintln(out, requiredTmpl)
+		}
 	}
 }
