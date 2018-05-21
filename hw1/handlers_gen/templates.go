@@ -112,7 +112,7 @@ func readParams(out *os.File, fields []Field, httpMethod string) {
 		readParamsPost(out, fields)
 
 	default:
-		// Decalare for post and get methods
+		// Declare variables for post and get methods
 		readParamsGet(out, fields)
 		readParamsPost(out, fields)
 	}
@@ -125,31 +125,15 @@ func readParamsGet(out *os.File, fields []Field) {
 			fmt.Fprintf(out, getFromQueryParam, f.Name, f.Name)
 		}
 
-		if f.Type == "int" {
-			tags, err := parseApivalidatorInt(f.Tag)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			if tags.ParamName != "" {
-				fmt.Fprintf(out, getFromQueryParam, f.Name, tags.ParamName)
-			} else {
-				fmt.Fprintf(out, getFromQueryParam, f.Name, f.Name)
-			}
-
+		tags, err := parseApivalidatorTags(f.Type, f.Tag)
+		if err != nil {
+			log.Fatal(err)
 		}
 
-		if f.Type == "string" {
-			tags, err := parseApivalidatorString(f.Tag)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			if tags.ParamName != "" {
-				fmt.Fprintf(out, getFromQueryParam, f.Name, tags.ParamName)
-			} else {
-				fmt.Fprintf(out, getFromQueryParam, f.Name, f.Name)
-			}
+		if tags.ParamName != "" {
+			fmt.Fprintf(out, getFromQueryParam, f.Name, tags.ParamName)
+		} else {
+			fmt.Fprintf(out, getFromQueryParam, f.Name, f.Name)
 		}
 	}
 
@@ -164,33 +148,27 @@ func readParamsPost(out *os.File, fields []Field) {
 			fmt.Fprintf(out, getFromForm, f.Name, f.Name)
 		}
 
-		if f.Type == "int" {
-			tags, err := parseApivalidatorInt(f.Tag)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			if tags.ParamName != "" {
-				fmt.Fprintf(out, getFromForm, f.Name, tags.ParamName)
-			} else {
-				fmt.Fprintf(out, getFromForm, f.Name, f.Name)
-			}
+		tags, err := parseApivalidatorTags(f.Type, f.Tag)
+		if err != nil {
+			log.Fatal(err)
 		}
 
-		if f.Type == "string" {
-			tags, err := parseApivalidatorString(f.Tag)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			if tags.ParamName != "" {
-				fmt.Fprintf(out, getFromForm, f.Name, tags.ParamName)
-			} else {
-				fmt.Fprintf(out, getFromForm, f.Name, f.Name)
-			}
+		if tags.ParamName != "" {
+			fmt.Fprintf(out, getFromForm, f.Name, tags.ParamName)
+		} else {
+			fmt.Fprintf(out, getFromForm, f.Name, f.Name)
 		}
 	}
 
 	fmt.Fprintln(out, "}")
 	fmt.Fprintln(out)
+}
+
+func validateParams(out *os.File, fields []Field) {
+	for _, f := range fields {
+		if f.Tag == "" {
+			continue
+		}
+
+	}
 }

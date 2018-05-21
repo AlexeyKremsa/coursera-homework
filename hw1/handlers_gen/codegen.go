@@ -19,21 +19,14 @@ func init() {
 	structFields = make(map[string][]Field)
 }
 
-type ApivalidatorInt struct {
-	Required  bool
-	ParamName string
-	Min       int
-	Max       int
-	Default   int
-}
-
-type ApiValidatorString struct {
-	Required  bool
-	ParamName string
-	Min       int
-	Max       int
-	Default   string
-	Enum      []string
+type ApiValidatorTags struct {
+	Required      bool
+	ParamName     string
+	Min           int
+	Max           int
+	DefaultString string
+	DefaultInt    int
+	Enum          []string
 }
 
 type Fields struct {
@@ -190,7 +183,6 @@ func main() {
 				// declareParams(out, fields)
 				// fmt.Fprintln(out) // empty line
 
-				// 3. Declare necessary fields
 				for _, p := range fn.Type.Params.List {
 					fmt.Println("Type: ", p.Type)
 					fmt.Println("Func name: ", fn.Name.Name)
@@ -206,8 +198,14 @@ func main() {
 						continue
 					}
 
+					// 3. Declare necessary fields
 					declareParams(out, fields)
+
+					// 4. Read params either from URL query or form body
 					readParams(out, fields, h.Method)
+
+					// 5. Validate params according to rules specified in tags
+
 				}
 
 				fmt.Fprintln(out) // empty line
