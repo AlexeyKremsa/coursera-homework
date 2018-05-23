@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"html/template"
 	"log"
 	"os"
+	"text/template"
 )
 
 var imports = `import (
@@ -58,8 +58,41 @@ var declareParamsTmpl = template.Must(template.New("declareParamsTmpl").Parse(`
 	var {{.Name}} {{.Type}}
 	{{- end}}`))
 
-//var ifStatementTmpl = template.Must(template.New("ifStatementTmpl").Parse(`
-//	if .Name == .Value {`))
+var atoiTmpl = template.Must(template.New("atoiTmpl").Parse(`
+	{{.FieldName}}Int, err := strconv.Atoi({{.FieldName}})
+	if err != nil {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "{{.FieldName}} must be int")
+		return
+	}
+	`))
+
+var minIntTmpl = template.Must(template.New("minIntTmpl").Parse(`
+	if {{.FieldName}}Int < {{.MinValue}} {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "{{.FieldName}} must be >= {{.MinValue}}")
+		return
+	}
+	`))
+
+var maxIntTmpl = template.Must(template.New("maxIntTmpl").Parse(`
+	if {{.FieldName}}Int > {{.MaxValue}} {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "{{.FieldName}} must be <= {{.MaxValue}}")
+		return
+	}
+	`))
+
+var minStringTmpl = template.Must(template.New("minStringTmpl").Parse(`
+	if len({{.FieldName}}) < {{.MinValue}} {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "{{.FieldName}} must be more than {{.MinValue}} characters")
+		return
+	}
+	`))
+
+var maxStringTmpl = template.Must(template.New("maxStringTmpl").Parse(`
+	if len({{.FieldName}}) > {{.MinValue}} {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "{{.FieldName}} must be less than {{.MaxValue}} characters")
+		return
+	}
+	`))
 
 var getFromQueryParam = "       %s = r.URL.Query().Get(`%s`)\n"
 var getFromForm = "       %s = r.FormValue(`%s`)\n"
@@ -102,8 +135,6 @@ func declareParams(out *os.File, fields []Field) {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	fmt.Fprintln(out)
 }
 
 func readParams(out *os.File, fields []Field, httpMethod string) {
@@ -155,7 +186,6 @@ func readParamsTmpl(out *os.File, fields []Field, httpMethod string) {
 	}
 
 	fmt.Fprintln(out, "    }")
-	fmt.Fprintln(out)
 }
 
 func validateParams(out *os.File, fields []Field) {
@@ -170,14 +200,71 @@ func validateParams(out *os.File, fields []Field) {
 			continue
 		}
 
+		// required
 		if tags.Required {
-			requiredTmpl := fmt.Sprintf(`
+			fmt.Fprintf(out, `
 	if %s == "" {
 		writeResponseJSON(w, http.StatusBadRequest, nil, "%s must me not empty")
 		return
-	}`, f.Name, f.Name)
-
-			fmt.Fprintln(out, requiredTmpl)
+	}
+	`, f.Name, f.Name)
 		}
+
+		// min, max
+		if tags.Max != "" || tags.Min != "" {
+			switch f.Type {
+			case "int":
+				model := minMaxIntTmplModel{
+					FieldName: f.Name,
+					MinValue:  tags.Min,
+					MaxValue:  tags.Max,
+				}
+
+				err := atoiTmpl.Execute(out, model)
+				if err != nil {
+					log.Fatal("atoiTmpl: ", err)
+				}
+
+				if tags.Min != "" {
+					err := minIntTmpl.Execute(out, model)
+					if err != nil {
+						log.Fatal("minIntTmpl: ", err)
+					}
+				}
+
+				if tags.Max != "" {
+					err := maxIntTmpl.Execute(out, model)
+					if err != nil {
+						log.Fatal("maxIntTmpl: ", err)
+					}
+				}
+
+			case "string":
+				model := minMaxIntTmplModel{
+					FieldName: f.Name,
+					MinValue:  tags.Min,
+					MaxValue:  tags.Max,
+				}
+
+				if tags.Min != "" {
+					err := minStringTmpl.Execute(out, model)
+					if err != nil {
+						log.Fatal("minStringTmpl: ", err)
+					}
+				}
+
+				if tags.Max != "" {
+					err := maxStringTmpl.Execute(out, model)
+					if err != nil {
+						log.Fatal("maxStringTmpl: ", err)
+					}
+				}
+
+			default:
+				log.Fatalf("Unsupported type: %s", f.Type)
+			}
+
+		}
+
 	}
 }

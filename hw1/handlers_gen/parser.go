@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 )
 
@@ -88,10 +87,7 @@ func parseApivalidatorTags(fieldType string, tag string) (*ApiValidatorTags, err
 					return nil, fmt.Errorf("parseApivalidatorInt: invalid `default` declaration")
 				}
 
-				tags.DefaultInt, err = strconv.Atoi(splitted[1])
-				if err != nil {
-					return nil, err
-				}
+				tags.DefaultInt = splitted[1]
 				continue
 			}
 
@@ -101,10 +97,7 @@ func parseApivalidatorTags(fieldType string, tag string) (*ApiValidatorTags, err
 					return nil, fmt.Errorf("parseApivalidatorInt: invalid `min` declaration")
 				}
 
-				tags.Min, err = strconv.Atoi(splitted[1])
-				if err != nil {
-					return nil, err
-				}
+				tags.Min = splitted[1]
 				continue
 			}
 
@@ -114,10 +107,7 @@ func parseApivalidatorTags(fieldType string, tag string) (*ApiValidatorTags, err
 					return nil, fmt.Errorf("parseApivalidatorInt: invalid `max` declaration")
 				}
 
-				tags.Max, err = strconv.Atoi(splitted[1])
-				if err != nil {
-					return nil, err
-				}
+				tags.Max = splitted[1]
 			}
 		}
 
@@ -160,10 +150,7 @@ func parseApivalidatorTags(fieldType string, tag string) (*ApiValidatorTags, err
 					return nil, fmt.Errorf("parseApivalidatorString: invalid `min` declaration")
 				}
 
-				tags.Min, err = strconv.Atoi(splitted[1])
-				if err != nil {
-					return nil, err
-				}
+				tags.Min = splitted[1]
 				continue
 			}
 
@@ -173,10 +160,7 @@ func parseApivalidatorTags(fieldType string, tag string) (*ApiValidatorTags, err
 					return nil, fmt.Errorf("parseApivalidatorString: invalid `max` declaration")
 				}
 
-				tags.Max, err = strconv.Atoi(splitted[1])
-				if err != nil {
-					return nil, err
-				}
+				tags.Max = splitted[1]
 			}
 
 			if strings.Contains(r, "enum") {

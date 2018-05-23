@@ -11,12 +11,12 @@ import (
 	"strings"
 )
 
-var structHandlers map[string][]handlerTmpl
+var structHandlers map[string][]handlerTmplModel
 var structFields map[string][]Field
 var fieldApivalidatorTags map[string]*ApiValidatorTags
 
 func init() {
-	structHandlers = make(map[string][]handlerTmpl)
+	structHandlers = make(map[string][]handlerTmplModel)
 	structFields = make(map[string][]Field)
 	fieldApivalidatorTags = make(map[string]*ApiValidatorTags)
 }
@@ -24,10 +24,10 @@ func init() {
 type ApiValidatorTags struct {
 	Required      bool
 	ParamName     string
-	Min           int
-	Max           int
+	Min           string
+	Max           string
 	DefaultString string
-	DefaultInt    int
+	DefaultInt    string
 	Enum          []string
 }
 
@@ -39,19 +39,6 @@ type Field struct {
 	Name string
 	Type string
 	Tag  string
-}
-
-type serveHttpTmplModel struct {
-	StructName string
-	Handlers   []handlerTmpl
-}
-
-type handlerTmpl struct {
-	HandlerName  string
-	ReceiverType string
-	URL          string
-	Method       string
-	IsProtected  bool
 }
 
 type ApigenComment struct {
@@ -146,7 +133,7 @@ func main() {
 					continue
 				}
 
-				h := handlerTmpl{}
+				h := handlerTmplModel{}
 				h.HandlerName = fn.Name.Name
 				h.ReceiverType = receiver
 				h.URL = apigen.URL
@@ -158,7 +145,7 @@ func main() {
 					handlers = append(handlers, h)
 					structHandlers[receiver] = handlers
 				} else {
-					handlers = make([]handlerTmpl, 1)
+					handlers = make([]handlerTmplModel, 1)
 					handlers[0] = h
 					structHandlers[receiver] = handlers
 				}

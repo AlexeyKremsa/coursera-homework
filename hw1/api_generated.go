@@ -33,22 +33,19 @@ func (srv *MyApi) wrapperProfile(w http.ResponseWriter, r *http.Request) {
 
 	var login string
 
-
 	if r.Method == http.MethodGet {
        login = r.URL.Query().Get(`login`)
     }
-
 
 	if r.Method == http.MethodPost {
        login = r.FormValue(`login`)
     }
 
-
 	if login == "" {
 		writeResponseJSON(w, http.StatusBadRequest, nil, "login must me not empty")
 		return
 	}
-
+	
 
 func (srv *MyApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {	
 	if r.Method != http.MethodPost {
@@ -61,7 +58,6 @@ func (srv *MyApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
 	var status string
 	var age int
 
-
 	if r.Method == http.MethodPost {
        login = r.FormValue(`login`)
        name = r.FormValue(`full_name`)
@@ -69,12 +65,32 @@ func (srv *MyApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
        age = r.FormValue(`age`)
     }
 
-
 	if login == "" {
 		writeResponseJSON(w, http.StatusBadRequest, nil, "login must me not empty")
 		return
 	}
-
+	
+	if len(login) < 10 {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "login must be more than 10 characters")
+		return
+	}
+	
+	ageInt, err := strconv.Atoi(age)
+	if err != nil {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "age must be int")
+		return
+	}
+	
+	if ageInt < 0 {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "age must be >= 0")
+		return
+	}
+	
+	if ageInt > 128 {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "age must be <= 128")
+		return
+	}
+	
 
 func (srv *OtherApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {	
 	if r.Method != http.MethodPost {
@@ -87,7 +103,6 @@ func (srv *OtherApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
 	var class string
 	var level int
 
-
 	if r.Method == http.MethodPost {
        username = r.FormValue(`username`)
        name = r.FormValue(`account_name`)
@@ -95,12 +110,32 @@ func (srv *OtherApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
        level = r.FormValue(`level`)
     }
 
-
 	if username == "" {
 		writeResponseJSON(w, http.StatusBadRequest, nil, "username must me not empty")
 		return
 	}
-
+	
+	if len(username) < 3 {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "username must be more than 3 characters")
+		return
+	}
+	
+	levelInt, err := strconv.Atoi(level)
+	if err != nil {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "level must be int")
+		return
+	}
+	
+	if levelInt < 1 {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "level must be >= 1")
+		return
+	}
+	
+	if levelInt > 50 {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "level must be <= 50")
+		return
+	}
+	
 
 func (srv *MyApi) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path { 
