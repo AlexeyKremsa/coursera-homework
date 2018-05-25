@@ -91,7 +91,7 @@ func parseApivalidatorTags(fieldType string, tag string) (*ApiValidatorTags, err
 				continue
 			}
 
-			if strings.Contains(r, "min") {
+			if strings.HasPrefix(r, "min") {
 				splitted := strings.Split(r, "=")
 				if len(splitted) == 0 || len(splitted) > 2 {
 					return nil, fmt.Errorf("parseApivalidatorInt: invalid `min` declaration")
@@ -101,7 +101,7 @@ func parseApivalidatorTags(fieldType string, tag string) (*ApiValidatorTags, err
 				continue
 			}
 
-			if strings.Contains(r, "max") {
+			if strings.HasPrefix(r, "max") {
 				splitted := strings.Split(r, "=")
 				if len(splitted) == 0 || len(splitted) > 2 {
 					return nil, fmt.Errorf("parseApivalidatorInt: invalid `max` declaration")
@@ -154,7 +154,7 @@ func parseApivalidatorTags(fieldType string, tag string) (*ApiValidatorTags, err
 				continue
 			}
 
-			if strings.Contains(r, "max") {
+			if strings.HasPrefix(r, "max") {
 				splitted := strings.Split(r, "=")
 				if len(splitted) == 0 || len(splitted) > 2 {
 					return nil, fmt.Errorf("parseApivalidatorString: invalid `max` declaration")

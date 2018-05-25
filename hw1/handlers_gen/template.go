@@ -58,6 +58,7 @@ var declareParamsTmpl = template.Must(template.New("declareParamsTmpl").Parse(`
 	var {{.Name}} {{.Type}}
 	{{- end}}`))
 
+// We assume that all int parameters will have `Int` suffix
 var atoiTmpl = template.Must(template.New("atoiTmpl").Parse(`
 	{{.FieldName}}Int, err := strconv.Atoi({{.FieldName}})
 	if err != nil {
@@ -94,8 +95,23 @@ var maxStringTmpl = template.Must(template.New("maxStringTmpl").Parse(`
 	}
 	`))
 
-var getFromQueryParam = "       %s = r.URL.Query().Get(`%s`)\n"
-var getFromForm = "       %s = r.FormValue(`%s`)\n"
+var enumTmpl = template.Must(template.New("enumTmpl").Parse(`
+	isStatusValid := false
+	for _, item := range {{.Enum}} {
+		if item == {{.FieldName}} {
+			isStatusValid = true
+				break
+		}
+	}
+
+	if !isStatusValid {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "unknown status: {{.FieldName}}")
+		return
+	}
+`))
+
+var getFromQueryParam = "%s = r.URL.Query().Get(`%s`)\n"
+var getFromForm = "%s = r.FormValue(`%s`)\n"
 
 func checkRequestMethodTmpl(out *os.File, allowedMethod string) {
 	// Both POST and GET allowed
@@ -141,24 +157,24 @@ func readParams(out *os.File, fields []Field, httpMethod string) {
 	fmt.Fprintln(out)
 
 	if httpMethod == "" {
-		readParamsTmpl(out, fields, "GET")
-		readParamsTmpl(out, fields, "POST")
+		readParamsMethodTmpl(out, fields, "GET")
+		readParamsMethodTmpl(out, fields, "POST")
 	} else {
-		readParamsTmpl(out, fields, httpMethod)
+		readParamsMethodTmpl(out, fields, httpMethod)
 	}
 }
 
-func readParamsTmpl(out *os.File, fields []Field, httpMethod string) {
+func readParamsMethodTmpl(out *os.File, fields []Field, httpMethod string) {
 	var getParamFrom string
 	switch httpMethod {
 	case "GET":
 		fmt.Fprintln(out, `
 	if r.Method == http.MethodGet {`)
-		getParamFrom = getFromQueryParam
+		getParamFrom = fmt.Sprintf("       %s", getFromQueryParam)
 	case "POST":
 		fmt.Fprintln(out, `
 	if r.Method == http.MethodPost {`)
-		getParamFrom = getFromForm
+		getParamFrom = fmt.Sprintf("       %s", getFromForm)
 	default:
 		log.Fatal("unsupported http method: ", httpMethod)
 	}
@@ -263,8 +279,41 @@ func validateParams(out *os.File, fields []Field) {
 			default:
 				log.Fatalf("Unsupported type: %s", f.Type)
 			}
-
 		}
 
+		// default
+		if tags.DefaultInt != "" || tags.DefaultString != "" {
+			switch f.Type {
+			case "int":
+				fmt.Fprintf(out, `
+	if %sInt == 0 {
+		%sInt = %s
+	}
+`, f.Name, f.Name, tags.DefaultInt)
+
+			case "string":
+				fmt.Fprintf(out, `
+	if %s == "" {
+		%s = %s
+	}
+`, f.Name, f.Name, tags.DefaultString)
+
+			default:
+				log.Fatalf("Unsupported type: %s", f.Type)
+			}
+		}
+
+		// enum
+		if len(tags.Enum) != 0 {
+			model := enumTmplModel{
+				FieldName: f.Name,
+				Enum:      tags.Enum,
+			}
+
+			err := enumTmpl.Execute(out, model)
+			if err != nil {
+				log.Fatal("enumTmpl: ", err.Error())
+			}
+		}
 	}
 }

@@ -75,6 +75,23 @@ func (srv *MyApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
+	if status == "" {
+		status = user
+	}
+
+		isStatusValid := false
+		for _, item := range [user moderator admin] {
+			if item == status {
+				isStatusValid = true
+				break
+			}
+		}
+
+		if !isStatusValid {
+			writeResponseJSON(w, http.StatusBadRequest, nil, "unknown status: status")
+			return
+		}
+
 	ageInt, err := strconv.Atoi(age)
 	if err != nil {
 		writeResponseJSON(w, http.StatusBadRequest, nil, "age must be int")
@@ -91,6 +108,10 @@ func (srv *MyApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
+	if ageInt == 0 {
+		ageInt = 3
+	}
+
 
 func (srv *OtherApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {	
 	if r.Method != http.MethodPost {
@@ -120,6 +141,23 @@ func (srv *OtherApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
+	if class == "" {
+		class = warrior
+	}
+
+		isStatusValid := false
+		for _, item := range [warrior sorcerer rouge] {
+			if item == class {
+				isStatusValid = true
+				break
+			}
+		}
+
+		if !isStatusValid {
+			writeResponseJSON(w, http.StatusBadRequest, nil, "unknown status: class")
+			return
+		}
+
 	levelInt, err := strconv.Atoi(level)
 	if err != nil {
 		writeResponseJSON(w, http.StatusBadRequest, nil, "level must be int")

@@ -18,3 +18,8 @@ type minMaxIntTmplModel struct {
 	MinValue  string
 	MaxValue  string
 }
+
+type enumTmplModel struct {
+	FieldName string
+	Enum      []string
+}
