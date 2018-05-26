@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"reflect"
-	"strings"
 )
 
 var structHandlers map[string][]handlerTmplModel
@@ -19,32 +18,6 @@ func init() {
 	structHandlers = make(map[string][]handlerTmplModel)
 	structFields = make(map[string][]Field)
 	fieldApivalidatorTags = make(map[string]*ApiValidatorTags)
-}
-
-type ApiValidatorTags struct {
-	Required      bool
-	ParamName     string
-	Min           string
-	Max           string
-	DefaultString string
-	DefaultInt    string
-	Enum          []string
-}
-
-type Fields struct {
-	Fields []Field
-}
-
-type Field struct {
-	Name string
-	Type string
-	Tag  string
-}
-
-type ApigenComment struct {
-	URL    string `json:"url"`
-	Auth   bool   `json:"auth"`
-	Method string `json:"method"`
 }
 
 func main() {
@@ -94,7 +67,7 @@ func main() {
 				// }
 
 				f := Field{
-					Name: strings.ToLower(field.Names[0].Name),
+					Name: field.Names[0].Name,
 					Type: fmt.Sprint(field.Type),
 					Tag:  tag,
 				}
@@ -159,6 +132,14 @@ func main() {
 				// 2. Check if request method is allowed
 				checkRequestMethodTmpl(out, h.Method)
 
+				// 3. Authentication
+				if h.IsProtected {
+					err = authTmpl.Execute(out, nil)
+					if err != nil {
+						log.Fatal(err)
+					}
+				}
+
 				// for _, p := range fn.Type.Params.List {
 				// 	fmt.Println("Type: ", p.Type)
 				// 	fmt.Println("Func name: ", fn.Name.Name)
@@ -172,29 +153,33 @@ func main() {
 				// declareParams(out, fields)
 				// fmt.Fprintln(out) // empty line
 
+				// loop through method params
 				for _, p := range fn.Type.Params.List {
 					fmt.Println("Type: ", p.Type)
 					fmt.Println("Func name: ", fn.Name.Name)
 
-					argType := fmt.Sprint(p.Type)
-					if argType == "&{context Context}" {
+					currentStruct := fmt.Sprint(p.Type)
+					if currentStruct == "&{context Context}" {
 						continue
 					}
 
-					fields, ok := structFields[argType]
+					fields, ok := structFields[currentStruct]
 					if !ok {
-						log.Println("Can't find fields for type: ", argType)
+						log.Println("Can't find fields for type: ", currentStruct)
 						continue
 					}
 
-					// 3. Declare necessary fields
+					// 4. Declare necessary fields
 					declareParams(out, fields)
 
-					// 4. Read params either from URL query or form body
+					// 5. Read params either from URL query or form body
 					readParams(out, fields, h.Method)
 
-					// 5. Validate params according to rules specified in tags
+					// 6. Validate params according to rules specified in tags
 					validateParams(out, fields)
+
+					// 7. Create an object and call receiver's method
+					declareObject(out, currentStruct, fields)
 				}
 
 				fmt.Fprintln(out) // empty line

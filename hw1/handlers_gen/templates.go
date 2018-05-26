@@ -97,7 +97,7 @@ var maxStringTmpl = template.Must(template.New("maxStringTmpl").Parse(`
 
 var enumTmpl = template.Must(template.New("enumTmpl").Parse(`
 	isStatusValid := false
-	for _, item := range {{.Enum}} {
+	for _, item := range statusList {
 		if item == {{.FieldName}} {
 			isStatusValid = true
 				break
@@ -109,6 +109,24 @@ var enumTmpl = template.Must(template.New("enumTmpl").Parse(`
 		return
 	}
 `))
+
+var authTmpl = template.Must(template.New(`authTmpl`).Parse(`
+	if r.Header.Get("X-Auth") != "100500" {
+		writeResponseJSON(w, http.StatusForbidden, nil, "unauthorized")
+		return
+	}`))
+
+var createObjTmpl = template.Must(template.New(`createObjTmpl`).Parse(`
+	paramsToPass := {{.StructName}} {
+		{{- range .Fields}}
+			{{- if (eq .Type "int")}}
+		{{.Name}}: {{.Name}}Int,
+			{{- else}}
+		{{.Name}}: {{.Name}},
+			{{- end}}
+		{{- end}}
+	}
+	`))
 
 var getFromQueryParam = "%s = r.URL.Query().Get(`%s`)\n"
 var getFromForm = "%s = r.FormValue(`%s`)\n"
@@ -124,7 +142,8 @@ func checkRequestMethodTmpl(out *os.File, allowedMethod string) {
 	if r.Method != http.MethodGet {
 		writeResponseJSON(w, http.StatusNotAcceptable, nil, "bad method")
 		return
-	}`)
+	}
+	`)
 	}
 
 	if allowedMethod == "POST" {
@@ -132,7 +151,8 @@ func checkRequestMethodTmpl(out *os.File, allowedMethod string) {
 	if r.Method != http.MethodPost {
 		writeResponseJSON(w, http.StatusNotAcceptable, nil, "bad method")
 		return
-	}`)
+	}
+	`)
 	}
 }
 
@@ -226,20 +246,45 @@ func validateParams(out *os.File, fields []Field) {
 	`, f.Name, f.Name)
 		}
 
+		model := minMaxIntTmplModel{
+			FieldName: f.Name,
+			MinValue:  tags.Min,
+			MaxValue:  tags.Max,
+		}
+
+		if f.Type == "int" {
+			err := atoiTmpl.Execute(out, model)
+			if err != nil {
+				log.Fatal("atoiTmpl: ", err)
+			}
+		}
+
+		// default
+		if tags.DefaultInt != "" || tags.DefaultString != "" {
+			switch f.Type {
+			case "int":
+				fmt.Fprintf(out, `
+	if %sInt == 0 {
+		%sInt = %s
+	}
+	`, f.Name, f.Name, tags.DefaultInt)
+
+			case "string":
+				fmt.Fprintf(out, `
+	if %s == "" {
+		%s = %s
+	}
+	`, f.Name, f.Name, tags.DefaultString)
+
+			default:
+				log.Fatalf("Unsupported type: %s", f.Type)
+			}
+		}
+
 		// min, max
 		if tags.Max != "" || tags.Min != "" {
 			switch f.Type {
 			case "int":
-				model := minMaxIntTmplModel{
-					FieldName: f.Name,
-					MinValue:  tags.Min,
-					MaxValue:  tags.Max,
-				}
-
-				err := atoiTmpl.Execute(out, model)
-				if err != nil {
-					log.Fatal("atoiTmpl: ", err)
-				}
 
 				if tags.Min != "" {
 					err := minIntTmpl.Execute(out, model)
@@ -256,12 +301,6 @@ func validateParams(out *os.File, fields []Field) {
 				}
 
 			case "string":
-				model := minMaxIntTmplModel{
-					FieldName: f.Name,
-					MinValue:  tags.Min,
-					MaxValue:  tags.Max,
-				}
-
 				if tags.Min != "" {
 					err := minStringTmpl.Execute(out, model)
 					if err != nil {
@@ -281,28 +320,6 @@ func validateParams(out *os.File, fields []Field) {
 			}
 		}
 
-		// default
-		if tags.DefaultInt != "" || tags.DefaultString != "" {
-			switch f.Type {
-			case "int":
-				fmt.Fprintf(out, `
-	if %sInt == 0 {
-		%sInt = %s
-	}
-`, f.Name, f.Name, tags.DefaultInt)
-
-			case "string":
-				fmt.Fprintf(out, `
-	if %s == "" {
-		%s = %s
-	}
-`, f.Name, f.Name, tags.DefaultString)
-
-			default:
-				log.Fatalf("Unsupported type: %s", f.Type)
-			}
-		}
-
 		// enum
 		if len(tags.Enum) != 0 {
 			model := enumTmplModel{
@@ -310,10 +327,25 @@ func validateParams(out *os.File, fields []Field) {
 				Enum:      tags.Enum,
 			}
 
+			// declare array with enums
+			fmt.Fprintf(out, fmt.Sprintf("statusList := %#v", tags.Enum))
+
 			err := enumTmpl.Execute(out, model)
 			if err != nil {
 				log.Fatal("enumTmpl: ", err.Error())
 			}
 		}
+	}
+}
+
+func declareObject(out *os.File, structName string, fields []Field) {
+	model := createObjModel{
+		StructName: structName,
+		Fields:     fields,
+	}
+
+	err := createObjTmpl.Execute(out, model)
+	if err != nil {
+		log.Fatal("declareObject: ", err.Error())
 	}
 }

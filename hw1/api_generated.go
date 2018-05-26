@@ -31,19 +31,23 @@ func writeResponseJSON(w http.ResponseWriter, status int, data interface{}, erro
 
 func (srv *MyApi) wrapperProfile(w http.ResponseWriter, r *http.Request) {
 
-	var login string
+	var Login string
 
 	if r.Method == http.MethodGet {
-       login = r.URL.Query().Get(`login`)
+       Login = r.URL.Query().Get(`Login`)
     }
 
 	if r.Method == http.MethodPost {
-       login = r.FormValue(`login`)
+       Login = r.FormValue(`Login`)
     }
 
-	if login == "" {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "login must me not empty")
+	if Login == "" {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "Login must me not empty")
 		return
+	}
+	
+	paramsToPass := ProfileParams {
+		Login: Login,
 	}
 	
 
@@ -52,126 +56,150 @@ func (srv *MyApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
 		writeResponseJSON(w, http.StatusNotAcceptable, nil, "bad method")
 		return
 	}
+	
+	if r.Header.Get("X-Auth") != "100500" {
+		writeResponseJSON(w, http.StatusForbidden, nil, "unauthorized")
+		return
+	}
 
-	var login string
-	var name string
-	var status string
-	var age int
+	var Login string
+	var Name string
+	var Status string
+	var Age int
 
 	if r.Method == http.MethodPost {
-       login = r.FormValue(`login`)
-       name = r.FormValue(`full_name`)
-       status = r.FormValue(`status`)
-       age = r.FormValue(`age`)
+       Login = r.FormValue(`Login`)
+       Name = r.FormValue(`full_name`)
+       Status = r.FormValue(`Status`)
+       Age = r.FormValue(`Age`)
     }
 
-	if login == "" {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "login must me not empty")
+	if Login == "" {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "Login must me not empty")
 		return
 	}
 	
-	if len(login) < 10 {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "login must be more than 10 characters")
+	if len(Login) < 10 {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "Login must be more than 10 characters")
 		return
 	}
 	
-	if status == "" {
-		status = user
+	if Status == "" {
+		Status = user
 	}
-
-		isStatusValid := false
-		for _, item := range [user moderator admin] {
-			if item == status {
-				isStatusValid = true
+	statusList := []string{"user", "moderator", "admin"}
+	isStatusValid := false
+	for _, item := range statusList {
+		if item == Status {
+			isStatusValid = true
 				break
-			}
 		}
+	}
 
-		if !isStatusValid {
-			writeResponseJSON(w, http.StatusBadRequest, nil, "unknown status: status")
-			return
-		}
+	if !isStatusValid {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "unknown status: Status")
+		return
+	}
 
-	ageInt, err := strconv.Atoi(age)
+	AgeInt, err := strconv.Atoi(Age)
 	if err != nil {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "age must be int")
+		writeResponseJSON(w, http.StatusBadRequest, nil, "Age must be int")
 		return
 	}
 	
-	if ageInt < 0 {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "age must be >= 0")
+	if AgeInt == 0 {
+		AgeInt = 3
+	}
+	
+	if AgeInt < 0 {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "Age must be >= 0")
 		return
 	}
 	
-	if ageInt > 128 {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "age must be <= 128")
+	if AgeInt > 128 {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "Age must be <= 128")
 		return
 	}
 	
-	if ageInt == 0 {
-		ageInt = 3
+	paramsToPass := CreateParams {
+		Login: Login,
+		Name: Name,
+		Status: Status,
+		Age: AgeInt,
 	}
-
+	
 
 func (srv *OtherApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {	
 	if r.Method != http.MethodPost {
 		writeResponseJSON(w, http.StatusNotAcceptable, nil, "bad method")
 		return
 	}
+	
+	if r.Header.Get("X-Auth") != "100500" {
+		writeResponseJSON(w, http.StatusForbidden, nil, "unauthorized")
+		return
+	}
 
-	var username string
-	var name string
-	var class string
-	var level int
+	var Username string
+	var Name string
+	var Class string
+	var Level int
 
 	if r.Method == http.MethodPost {
-       username = r.FormValue(`username`)
-       name = r.FormValue(`account_name`)
-       class = r.FormValue(`class`)
-       level = r.FormValue(`level`)
+       Username = r.FormValue(`Username`)
+       Name = r.FormValue(`account_name`)
+       Class = r.FormValue(`Class`)
+       Level = r.FormValue(`Level`)
     }
 
-	if username == "" {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "username must me not empty")
+	if Username == "" {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "Username must me not empty")
 		return
 	}
 	
-	if len(username) < 3 {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "username must be more than 3 characters")
+	if len(Username) < 3 {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "Username must be more than 3 characters")
 		return
 	}
 	
-	if class == "" {
-		class = warrior
+	if Class == "" {
+		Class = warrior
 	}
-
-		isStatusValid := false
-		for _, item := range [warrior sorcerer rouge] {
-			if item == class {
-				isStatusValid = true
+	statusList := []string{"warrior", "sorcerer", "rouge"}
+	isStatusValid := false
+	for _, item := range statusList {
+		if item == Class {
+			isStatusValid = true
 				break
-			}
 		}
+	}
 
-		if !isStatusValid {
-			writeResponseJSON(w, http.StatusBadRequest, nil, "unknown status: class")
-			return
-		}
+	if !isStatusValid {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "unknown status: Class")
+		return
+	}
 
-	levelInt, err := strconv.Atoi(level)
+	LevelInt, err := strconv.Atoi(Level)
 	if err != nil {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "level must be int")
+		writeResponseJSON(w, http.StatusBadRequest, nil, "Level must be int")
 		return
 	}
 	
-	if levelInt < 1 {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "level must be >= 1")
+	if LevelInt < 1 {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "Level must be >= 1")
 		return
 	}
 	
-	if levelInt > 50 {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "level must be <= 50")
+	if LevelInt > 50 {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "Level must be <= 50")
 		return
+	}
+	
+	paramsToPass := OtherCreateParams {
+		Username: Username,
+		Name: Name,
+		Class: Class,
+		Level: LevelInt,
 	}
 	
 
