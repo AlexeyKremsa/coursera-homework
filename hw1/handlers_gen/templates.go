@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"text/template"
 )
 
@@ -16,8 +17,8 @@ var imports = `import (
 
 var response = `
 type response struct {
-	Error    string      "json:'error'"
-	Response interface{} "json:'response,omitempty'"
+	Error    string      ``json:"error"``
+	Response interface{} ``json:"response,omitempty"``
 }
 
 func writeResponseJSON(w http.ResponseWriter, status int, data interface{}, errorText string) {
@@ -55,7 +56,7 @@ func (srv *{{.ReceiverType}}) wrapper{{.HandlerName}}(w http.ResponseWriter, r *
 
 var declareParamsTmpl = template.Must(template.New("declareParamsTmpl").Parse(`
 	{{- range .Fields}}
-	var {{.Name}} {{.Type}}
+	var {{.Name}} string
 	{{- end}}`))
 
 // We assume that all int parameters will have `Int` suffix
@@ -127,6 +128,22 @@ var createObjTmpl = template.Must(template.New(`createObjTmpl`).Parse(`
 		{{- end}}
 	}
 	`))
+
+var callMethodTmpl = template.Must(template.New(`callMethodTmpl`).Parse(`
+	resp, err := srv.{{.HandlerName}}(r.Context(), paramsToPass)
+	if err != nil {
+		apiErr, ok := err.(ApiError)
+		if ok {
+			writeResponseJSON(w, apiErr.HTTPStatus, nil, apiErr.Err.Error())
+			return
+		}
+
+		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+		return
+	}
+
+	writeResponseJSON(w, http.StatusOK, resp, "")
+}`))
 
 var getFromQueryParam = "%s = r.URL.Query().Get(`%s`)\n"
 var getFromForm = "%s = r.FormValue(`%s`)\n"
@@ -201,7 +218,7 @@ func readParamsMethodTmpl(out *os.File, fields []Field, httpMethod string) {
 
 	for _, f := range fields {
 		if f.Tag == "" {
-			fmt.Fprintf(out, getParamFrom, f.Name, f.Name)
+			fmt.Fprintf(out, getParamFrom, f.Name, strings.ToLower(f.Name))
 			continue
 		}
 
@@ -215,9 +232,9 @@ func readParamsMethodTmpl(out *os.File, fields []Field, httpMethod string) {
 		fieldApivalidatorTags[f.Name] = tags
 
 		if tags.ParamName != "" {
-			fmt.Fprintf(out, getParamFrom, f.Name, tags.ParamName)
+			fmt.Fprintf(out, getParamFrom, f.Name, strings.ToLower(tags.ParamName))
 		} else {
-			fmt.Fprintf(out, getParamFrom, f.Name, f.Name)
+			fmt.Fprintf(out, getParamFrom, f.Name, strings.ToLower(f.Name))
 		}
 	}
 
@@ -272,7 +289,7 @@ func validateParams(out *os.File, fields []Field) {
 			case "string":
 				fmt.Fprintf(out, `
 	if %s == "" {
-		%s = %s
+		%s = "%s"
 	}
 	`, f.Name, f.Name, tags.DefaultString)
 
@@ -347,5 +364,12 @@ func declareObject(out *os.File, structName string, fields []Field) {
 	err := createObjTmpl.Execute(out, model)
 	if err != nil {
 		log.Fatal("declareObject: ", err.Error())
+	}
+}
+
+func callMethod(out *os.File, h *handlerTmplModel) {
+	err := callMethodTmpl.Execute(out, h)
+	if err != nil {
+		log.Fatal("callMethod: ", err.Error())
 	}
 }

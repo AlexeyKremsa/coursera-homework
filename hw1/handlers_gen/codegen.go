@@ -180,6 +180,9 @@ func main() {
 
 					// 7. Create an object and call receiver's method
 					declareObject(out, currentStruct, fields)
+
+					// 8. Call method
+					callMethod(out, &h)
 				}
 
 				fmt.Fprintln(out) // empty line

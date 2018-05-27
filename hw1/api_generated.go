@@ -34,11 +34,11 @@ func (srv *MyApi) wrapperProfile(w http.ResponseWriter, r *http.Request) {
 	var Login string
 
 	if r.Method == http.MethodGet {
-       Login = r.URL.Query().Get(`Login`)
+       Login = r.URL.Query().Get(`login`)
     }
 
 	if r.Method == http.MethodPost {
-       Login = r.FormValue(`Login`)
+       Login = r.FormValue(`login`)
     }
 
 	if Login == "" {
@@ -50,6 +50,20 @@ func (srv *MyApi) wrapperProfile(w http.ResponseWriter, r *http.Request) {
 		Login: Login,
 	}
 	
+	resp, err := srv.Profile(r.Context(), paramsToPass)
+	if err != nil {
+		apiErr, ok := err.(ApiError)
+		if ok {
+			writeResponseJSON(w, apiErr.HTTPStatus, nil, apiErr.Err.Error())
+			return
+		}
+
+		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+		return
+	}
+
+	writeResponseJSON(w, http.StatusOK, resp, "")
+}
 
 func (srv *MyApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {	
 	if r.Method != http.MethodPost {
@@ -65,13 +79,13 @@ func (srv *MyApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
 	var Login string
 	var Name string
 	var Status string
-	var Age int
+	var Age string
 
 	if r.Method == http.MethodPost {
-       Login = r.FormValue(`Login`)
+       Login = r.FormValue(`login`)
        Name = r.FormValue(`full_name`)
-       Status = r.FormValue(`Status`)
-       Age = r.FormValue(`Age`)
+       Status = r.FormValue(`status`)
+       Age = r.FormValue(`age`)
     }
 
 	if Login == "" {
@@ -85,7 +99,7 @@ func (srv *MyApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	if Status == "" {
-		Status = user
+		Status = "user"
 	}
 	statusList := []string{"user", "moderator", "admin"}
 	isStatusValid := false
@@ -128,6 +142,20 @@ func (srv *MyApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
 		Age: AgeInt,
 	}
 	
+	resp, err := srv.Create(r.Context(), paramsToPass)
+	if err != nil {
+		apiErr, ok := err.(ApiError)
+		if ok {
+			writeResponseJSON(w, apiErr.HTTPStatus, nil, apiErr.Err.Error())
+			return
+		}
+
+		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+		return
+	}
+
+	writeResponseJSON(w, http.StatusOK, resp, "")
+}
 
 func (srv *OtherApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {	
 	if r.Method != http.MethodPost {
@@ -143,13 +171,13 @@ func (srv *OtherApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
 	var Username string
 	var Name string
 	var Class string
-	var Level int
+	var Level string
 
 	if r.Method == http.MethodPost {
-       Username = r.FormValue(`Username`)
+       Username = r.FormValue(`username`)
        Name = r.FormValue(`account_name`)
-       Class = r.FormValue(`Class`)
-       Level = r.FormValue(`Level`)
+       Class = r.FormValue(`class`)
+       Level = r.FormValue(`level`)
     }
 
 	if Username == "" {
@@ -163,7 +191,7 @@ func (srv *OtherApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	if Class == "" {
-		Class = warrior
+		Class = "warrior"
 	}
 	statusList := []string{"warrior", "sorcerer", "rouge"}
 	isStatusValid := false
@@ -202,6 +230,20 @@ func (srv *OtherApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
 		Level: LevelInt,
 	}
 	
+	resp, err := srv.Create(r.Context(), paramsToPass)
+	if err != nil {
+		apiErr, ok := err.(ApiError)
+		if ok {
+			writeResponseJSON(w, apiErr.HTTPStatus, nil, apiErr.Err.Error())
+			return
+		}
+
+		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+		return
+	}
+
+	writeResponseJSON(w, http.StatusOK, resp, "")
+}
 
 func (srv *MyApi) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path { 
