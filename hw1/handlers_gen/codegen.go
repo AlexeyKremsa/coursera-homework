@@ -30,11 +30,22 @@ func checkError(err error) {
 }
 
 func main() {
-	out, err := os.Create("../api_handlers.go")
+	if len(os.Args) != 3 {
+		log.Fatal("Invalid arguments provided")
+	}
+
+	fileToParse := os.Args[1]
+	fileToGenerate := os.Args[2]
+
+	if fileToGenerate == "" || fileToParse == "" {
+		log.Fatal("Flags can not be empty")
+	}
+
+	out, err := os.Create(fileToGenerate)
 	checkError(err)
 
 	fset := token.NewFileSet()
-	node, err := parser.ParseFile(fset, "../api.go", nil, parser.ParseComments)
+	node, err := parser.ParseFile(fset, fileToParse, nil, parser.ParseComments)
 	checkError(err)
 
 	_, err = fmt.Fprintln(out, `package `+node.Name.Name)
