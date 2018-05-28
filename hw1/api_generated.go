@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 )
-
 type response struct {
-	Error    string      "json:'error'"
-	Response interface{} "json:'response,omitempty'"
+	Error    string      `json:"error"`
+	Response interface{} `json:"response,omitempty"`
 }
 
 func writeResponseJSON(w http.ResponseWriter, status int, data interface{}, errorText string) {
@@ -42,7 +42,7 @@ func (srv *MyApi) wrapperProfile(w http.ResponseWriter, r *http.Request) {
     }
 
 	if Login == "" {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "Login must me not empty")
+		writeResponseJSON(w, http.StatusBadRequest, nil, "login must me not empty")
 		return
 	}
 	
@@ -89,12 +89,12 @@ func (srv *MyApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
     }
 
 	if Login == "" {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "Login must me not empty")
+		writeResponseJSON(w, http.StatusBadRequest, nil, "login must me not empty")
 		return
 	}
 	
 	if len(Login) < 10 {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "Login must be more than 10 characters")
+		writeResponseJSON(w, http.StatusBadRequest, nil, strings.ToLower("Login len must be >= 10"))
 		return
 	}
 	
@@ -111,13 +111,13 @@ func (srv *MyApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !isStatusValid {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "unknown status: Status")
+		writeResponseJSON(w, http.StatusBadRequest, nil, fmt.Sprintf("status must be one of [%s]", strings.Join(statusList, ", ")))
 		return
 	}
 
 	AgeInt, err := strconv.Atoi(Age)
 	if err != nil {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "Age must be int")
+		writeResponseJSON(w, http.StatusBadRequest, nil, strings.ToLower("Age must be int"))
 		return
 	}
 	
@@ -126,12 +126,12 @@ func (srv *MyApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	if AgeInt < 0 {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "Age must be >= 0")
+		writeResponseJSON(w, http.StatusBadRequest, nil, strings.ToLower("Age must be >= 0"))
 		return
 	}
 	
 	if AgeInt > 128 {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "Age must be <= 128")
+		writeResponseJSON(w, http.StatusBadRequest, nil, strings.ToLower("Age must be <= 128"))
 		return
 	}
 	
@@ -181,12 +181,12 @@ func (srv *OtherApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
     }
 
 	if Username == "" {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "Username must me not empty")
+		writeResponseJSON(w, http.StatusBadRequest, nil, "username must me not empty")
 		return
 	}
 	
 	if len(Username) < 3 {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "Username must be more than 3 characters")
+		writeResponseJSON(w, http.StatusBadRequest, nil, strings.ToLower("Username len must be >= 3"))
 		return
 	}
 	
@@ -203,23 +203,23 @@ func (srv *OtherApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !isStatusValid {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "unknown status: Class")
+		writeResponseJSON(w, http.StatusBadRequest, nil, fmt.Sprintf("status must be one of [%s]", strings.Join(statusList, ", ")))
 		return
 	}
 
 	LevelInt, err := strconv.Atoi(Level)
 	if err != nil {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "Level must be int")
+		writeResponseJSON(w, http.StatusBadRequest, nil, strings.ToLower("Level must be int"))
 		return
 	}
 	
 	if LevelInt < 1 {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "Level must be >= 1")
+		writeResponseJSON(w, http.StatusBadRequest, nil, strings.ToLower("Level must be >= 1"))
 		return
 	}
 	
 	if LevelInt > 50 {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "Level must be <= 50")
+		writeResponseJSON(w, http.StatusBadRequest, nil, strings.ToLower("Level must be <= 50"))
 		return
 	}
 	

@@ -33,9 +33,9 @@ func main() {
 	}
 
 	fmt.Fprintln(out, `package `+node.Name.Name)
-	fmt.Fprintln(out) // empty line
-	fmt.Fprintln(out, imports)
-	fmt.Fprintln(out, response)
+	fmt.Fprint(out, imports)
+	fmt.Fprintf(out, responseStruct, "`json:\"error\"`", "`json:\"response,omitempty\"`")
+	fmt.Fprintln(out, responseFunc)
 
 	// Parse structs
 	for _, f := range node.Decls {

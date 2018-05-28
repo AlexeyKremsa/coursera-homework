@@ -8,19 +8,23 @@ import (
 	"text/template"
 )
 
-var imports = `import (
+var imports = `
+import (
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
-)`
+	"strings"
+)
+`
 
-var response = `
-type response struct {
-	Error    string      ``json:"error"``
-	Response interface{} ``json:"response,omitempty"``
+var responseStruct = `type response struct {
+	Error    string      %s
+	Response interface{} %s
 }
+`
 
+var responseFunc = `
 func writeResponseJSON(w http.ResponseWriter, status int, data interface{}, errorText string) {
 	w.Header().Set("Content-Type", "application/json")
 	resp := response{
@@ -63,35 +67,35 @@ var declareParamsTmpl = template.Must(template.New("declareParamsTmpl").Parse(`
 var atoiTmpl = template.Must(template.New("atoiTmpl").Parse(`
 	{{.FieldName}}Int, err := strconv.Atoi({{.FieldName}})
 	if err != nil {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "{{.FieldName}} must be int")
+		writeResponseJSON(w, http.StatusBadRequest, nil, strings.ToLower("{{.FieldName}} must be int"))
 		return
 	}
 	`))
 
 var minIntTmpl = template.Must(template.New("minIntTmpl").Parse(`
 	if {{.FieldName}}Int < {{.MinValue}} {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "{{.FieldName}} must be >= {{.MinValue}}")
+		writeResponseJSON(w, http.StatusBadRequest, nil, strings.ToLower("{{.FieldName}} must be >= {{.MinValue}}"))
 		return
 	}
 	`))
 
 var maxIntTmpl = template.Must(template.New("maxIntTmpl").Parse(`
 	if {{.FieldName}}Int > {{.MaxValue}} {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "{{.FieldName}} must be <= {{.MaxValue}}")
+		writeResponseJSON(w, http.StatusBadRequest, nil, strings.ToLower("{{.FieldName}} must be <= {{.MaxValue}}"))
 		return
 	}
 	`))
 
 var minStringTmpl = template.Must(template.New("minStringTmpl").Parse(`
 	if len({{.FieldName}}) < {{.MinValue}} {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "{{.FieldName}} must be more than {{.MinValue}} characters")
+		writeResponseJSON(w, http.StatusBadRequest, nil, strings.ToLower("{{.FieldName}} len must be >= {{.MinValue}}"))
 		return
 	}
 	`))
 
 var maxStringTmpl = template.Must(template.New("maxStringTmpl").Parse(`
 	if len({{.FieldName}}) > {{.MinValue}} {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "{{.FieldName}} must be less than {{.MaxValue}} characters")
+		writeResponseJSON(w, http.StatusBadRequest, nil, strings.ToLower("{{.FieldName}} len must be <= {{.MaxValue}}"))
 		return
 	}
 	`))
@@ -106,7 +110,7 @@ var enumTmpl = template.Must(template.New("enumTmpl").Parse(`
 	}
 
 	if !isStatusValid {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "unknown status: {{.FieldName}}")
+		writeResponseJSON(w, http.StatusBadRequest, nil, fmt.Sprintf("status must be one of [%s]", strings.Join(statusList, ", ")))
 		return
 	}
 `))
@@ -260,7 +264,7 @@ func validateParams(out *os.File, fields []Field) {
 		writeResponseJSON(w, http.StatusBadRequest, nil, "%s must me not empty")
 		return
 	}
-	`, f.Name, f.Name)
+	`, f.Name, strings.ToLower(f.Name))
 		}
 
 		model := minMaxIntTmplModel{
