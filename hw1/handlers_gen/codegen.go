@@ -20,22 +20,26 @@ func init() {
 	fieldApivalidatorTags = make(map[string]*ApiValidatorTags)
 }
 
-func main() {
-	out, err := os.Create("../api_generated.go")
+func checkError(err error) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func main() {
+	out, err := os.Create("../api_generated.go")
+	checkError(err)
 
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, "../api.go", nil, parser.ParseComments)
-	if err != nil {
-		log.Fatal(err)
-	}
+	checkError(err)
 
-	fmt.Fprintln(out, `package `+node.Name.Name)
-	fmt.Fprint(out, imports)
-	fmt.Fprintf(out, responseStruct, "`json:\"error\"`", "`json:\"response,omitempty\"`")
-	fmt.Fprintln(out, responseFunc)
+	_, err = fmt.Fprintln(out, `package `+node.Name.Name)
+	checkError(err)
+	_, err = fmt.Fprint(out, imports)
+	checkError(err)
+	_, err = fmt.Fprintf(out, response, "`json:\"error\"`", "`json:\"response,omitempty\"`")
+	checkError(err)
 
 	// Parse structs
 	for _, f := range node.Decls {
@@ -62,9 +66,6 @@ func main() {
 				if field.Tag != nil {
 					tag = fmt.Sprint(reflect.StructTag(field.Tag.Value[1 : len(field.Tag.Value)-1]))
 				}
-				// if tag.Get("apivalidator") == "" {
-				// 	continue
-				// }
 
 				f := Field{
 					Name: field.Names[0].Name,
@@ -125,9 +126,7 @@ func main() {
 
 				// 1. Declare a function
 				err = funcDeclarationTmpl.Execute(out, h)
-				if err != nil {
-					log.Fatal(err)
-				}
+				checkError(err)
 
 				// 2. Check if request method is allowed
 				checkRequestMethodTmpl(out, h.Method)
@@ -135,23 +134,8 @@ func main() {
 				// 3. Authentication
 				if h.IsProtected {
 					err = authTmpl.Execute(out, nil)
-					if err != nil {
-						log.Fatal(err)
-					}
+					checkError(err)
 				}
-
-				// for _, p := range fn.Type.Params.List {
-				// 	fmt.Println("Type: ", p.Type)
-				// 	fmt.Println("Func name: ", fn.Name.Name)
-				// }
-
-				// fields, ok := structFields[h.ReceiverType]
-				// if !ok || len(fields) == 0 {
-				// 	log.Println("Can't declare fields for type: ", h.ReceiverType)
-				// 	continue
-				// }
-				// declareParams(out, fields)
-				// fmt.Fprintln(out) // empty line
 
 				// loop through method params
 				for _, p := range fn.Type.Params.List {
@@ -184,12 +168,8 @@ func main() {
 					// 8. Call method
 					callMethod(out, &h)
 				}
-
-				fmt.Fprintln(out) // empty line
 			}
-
 		}
-
 	}
 
 	// Generate ServeHttp
@@ -200,17 +180,6 @@ func main() {
 		}
 
 		err = serveHttpTmpl.Execute(out, model)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		// for _, h := range v {
-		// 	err := funcDeclarationTmpl.Execute(out, h)
-		// 	if err != nil {
-		// 		log.Fatal(err)
-		// 	}
-		// }
-
-		fmt.Fprintln(out) // empty line
+		checkError(err)
 	}
 }

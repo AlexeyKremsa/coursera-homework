@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"text/template"
+
+	"github.com/pkg/errors"
 )
 
 var imports = `
@@ -18,13 +20,11 @@ import (
 )
 `
 
-var responseStruct = `type response struct {
+var response = `type response struct {
 	Error    string      %s
 	Response interface{} %s
 }
-`
 
-var responseFunc = `
 func writeResponseJSON(w http.ResponseWriter, status int, data interface{}, errorText string) {
 	w.Header().Set("Content-Type", "application/json")
 	resp := response{
@@ -40,7 +40,8 @@ func writeResponseJSON(w http.ResponseWriter, status int, data interface{}, erro
 		w.WriteHeader(status)
 		w.Write(jsonResp)
 	}
-}`
+}
+`
 
 var serveHttpTmpl = template.Must(template.New("serveHttpTmpl").Parse(`
 func (srv *{{.StructName}}) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -53,12 +54,14 @@ func (srv *{{.StructName}}) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		default:
 			writeResponseJSON(w, http.StatusNotFound, nil, "unknown method")
 		}
-	}`))
+}
+`))
 
 var funcDeclarationTmpl = template.Must(template.New("funcDeclarationTmpl").Parse(`
 func (srv *{{.ReceiverType}}) wrapper{{.HandlerName}}(w http.ResponseWriter, r *http.Request) {`))
 
 var declareParamsTmpl = template.Must(template.New("declareParamsTmpl").Parse(`
+	
 	{{- range .Fields}}
 	var {{.Name}} string
 	{{- end}}`))
@@ -147,7 +150,8 @@ var callMethodTmpl = template.Must(template.New(`callMethodTmpl`).Parse(`
 	}
 
 	writeResponseJSON(w, http.StatusOK, resp, "")
-}`))
+}
+`))
 
 var getFromQueryParam = "%s = r.URL.Query().Get(`%s`)\n"
 var getFromForm = "%s = r.FormValue(`%s`)\n"
@@ -159,27 +163,27 @@ func checkRequestMethodTmpl(out *os.File, allowedMethod string) {
 	}
 
 	if allowedMethod == "GET" {
-		fmt.Fprint(out, `
+		_, err := fmt.Fprint(out, `
 	if r.Method != http.MethodGet {
 		writeResponseJSON(w, http.StatusNotAcceptable, nil, "bad method")
 		return
 	}
 	`)
+		checkError(errors.Wrap(err, "checkRequestMethodTmpl"))
 	}
 
 	if allowedMethod == "POST" {
-		fmt.Fprint(out, `	
+		_, err := fmt.Fprint(out, `	
 	if r.Method != http.MethodPost {
 		writeResponseJSON(w, http.StatusNotAcceptable, nil, "bad method")
 		return
 	}
 	`)
+		checkError(errors.Wrap(err, "checkRequestMethodTmpl"))
 	}
 }
 
 func declareParams(out *os.File, fields []Field) {
-	fmt.Fprintln(out)
-
 	if len(fields) == 0 {
 		log.Fatal("There are no fields to read")
 	}
@@ -189,13 +193,12 @@ func declareParams(out *os.File, fields []Field) {
 	}
 
 	err := declareParamsTmpl.Execute(out, flds)
-	if err != nil {
-		log.Fatal(err)
-	}
+	checkError(errors.Wrap(err, "declareParams"))
 }
 
 func readParams(out *os.File, fields []Field, httpMethod string) {
-	fmt.Fprintln(out)
+	_, err := fmt.Fprintln(out)
+	checkError(err)
 
 	if httpMethod == "" {
 		readParamsMethodTmpl(out, fields, "GET")
@@ -209,12 +212,16 @@ func readParamsMethodTmpl(out *os.File, fields []Field, httpMethod string) {
 	var getParamFrom string
 	switch httpMethod {
 	case "GET":
-		fmt.Fprintln(out, `
+		_, err := fmt.Fprintln(out, `
 	if r.Method == http.MethodGet {`)
+		checkError(errors.Wrap(err, "readParamsMethodTmpl"))
+
 		getParamFrom = fmt.Sprintf("       %s", getFromQueryParam)
 	case "POST":
-		fmt.Fprintln(out, `
+		_, err := fmt.Fprintln(out, `
 	if r.Method == http.MethodPost {`)
+		checkError(errors.Wrap(err, "readParamsMethodTmpl"))
+
 		getParamFrom = fmt.Sprintf("       %s", getFromForm)
 	default:
 		log.Fatal("unsupported http method: ", httpMethod)
@@ -222,27 +229,29 @@ func readParamsMethodTmpl(out *os.File, fields []Field, httpMethod string) {
 
 	for _, f := range fields {
 		if f.Tag == "" {
-			fmt.Fprintf(out, getParamFrom, f.Name, strings.ToLower(f.Name))
+			_, err := fmt.Fprintf(out, getParamFrom, f.Name, strings.ToLower(f.Name))
+			checkError(errors.Wrap(err, "readParamsMethodTmpl"))
 			continue
 		}
 
 		tags, err := parseApivalidatorTags(f.Type, f.Tag)
-		if err != nil {
-			log.Fatal(err)
-		}
+		checkError(errors.Wrap(err, "readParamsMethodTmpl"))
 
 		// we can reuse tags without parsing them again
 		// this approach is used to avoid validation code duplicate for post and get methods
 		fieldApivalidatorTags[f.Name] = tags
 
 		if tags.ParamName != "" {
-			fmt.Fprintf(out, getParamFrom, f.Name, strings.ToLower(tags.ParamName))
+			_, err := fmt.Fprintf(out, getParamFrom, f.Name, strings.ToLower(tags.ParamName))
+			checkError(errors.Wrap(err, "readParamsMethodTmpl"))
 		} else {
-			fmt.Fprintf(out, getParamFrom, f.Name, strings.ToLower(f.Name))
+			_, err := fmt.Fprintf(out, getParamFrom, f.Name, strings.ToLower(f.Name))
+			checkError(errors.Wrap(err, "readParamsMethodTmpl"))
 		}
 	}
 
-	fmt.Fprintln(out, "    }")
+	_, err := fmt.Fprintln(out, "    }")
+	checkError(errors.Wrap(err, "readParamsMethodTmpl"))
 }
 
 func validateParams(out *os.File, fields []Field) {
@@ -253,18 +262,18 @@ func validateParams(out *os.File, fields []Field) {
 
 		tags, ok := fieldApivalidatorTags[f.Name]
 		if !ok {
-			log.Println("Can't find apivalidator tag for field: ", f.Name)
 			continue
 		}
 
 		// required
 		if tags.Required {
-			fmt.Fprintf(out, `
+			_, err := fmt.Fprintf(out, `
 	if %s == "" {
 		writeResponseJSON(w, http.StatusBadRequest, nil, "%s must me not empty")
 		return
 	}
 	`, f.Name, strings.ToLower(f.Name))
+			checkError(errors.Wrap(err, "validateParams"))
 		}
 
 		model := minMaxIntTmplModel{
@@ -275,27 +284,27 @@ func validateParams(out *os.File, fields []Field) {
 
 		if f.Type == "int" {
 			err := atoiTmpl.Execute(out, model)
-			if err != nil {
-				log.Fatal("atoiTmpl: ", err)
-			}
+			checkError(errors.Wrap(err, "atoiTmpl"))
 		}
 
 		// default
 		if tags.DefaultInt != "" || tags.DefaultString != "" {
 			switch f.Type {
 			case "int":
-				fmt.Fprintf(out, `
+				_, err := fmt.Fprintf(out, `
 	if %sInt == 0 {
 		%sInt = %s
 	}
 	`, f.Name, f.Name, tags.DefaultInt)
+				checkError(errors.Wrap(err, "validateParams"))
 
 			case "string":
-				fmt.Fprintf(out, `
+				_, err := fmt.Fprintf(out, `
 	if %s == "" {
 		%s = "%s"
 	}
 	`, f.Name, f.Name, tags.DefaultString)
+				checkError(errors.Wrap(err, "validateParams"))
 
 			default:
 				log.Fatalf("Unsupported type: %s", f.Type)
@@ -309,31 +318,23 @@ func validateParams(out *os.File, fields []Field) {
 
 				if tags.Min != "" {
 					err := minIntTmpl.Execute(out, model)
-					if err != nil {
-						log.Fatal("minIntTmpl: ", err)
-					}
+					checkError(errors.Wrap(err, "minIntTmpl"))
 				}
 
 				if tags.Max != "" {
 					err := maxIntTmpl.Execute(out, model)
-					if err != nil {
-						log.Fatal("maxIntTmpl: ", err)
-					}
+					checkError(errors.Wrap(err, "maxIntTmpl"))
 				}
 
 			case "string":
 				if tags.Min != "" {
 					err := minStringTmpl.Execute(out, model)
-					if err != nil {
-						log.Fatal("minStringTmpl: ", err)
-					}
+					checkError(errors.Wrap(err, "minStrngTmpl"))
 				}
 
 				if tags.Max != "" {
 					err := maxStringTmpl.Execute(out, model)
-					if err != nil {
-						log.Fatal("maxStringTmpl: ", err)
-					}
+					checkError(errors.Wrap(err, "maxStringTmpl"))
 				}
 
 			default:
@@ -349,12 +350,11 @@ func validateParams(out *os.File, fields []Field) {
 			}
 
 			// declare array with enums
-			fmt.Fprintf(out, fmt.Sprintf("statusList := %#v", tags.Enum))
+			_, err := fmt.Fprintf(out, fmt.Sprintf("statusList := %#v", tags.Enum))
+			checkError(errors.Wrap(err, "validateParams"))
 
-			err := enumTmpl.Execute(out, model)
-			if err != nil {
-				log.Fatal("enumTmpl: ", err.Error())
-			}
+			err = enumTmpl.Execute(out, model)
+			checkError(errors.Wrap(err, "enumTmpl"))
 		}
 	}
 }
@@ -366,14 +366,10 @@ func declareObject(out *os.File, structName string, fields []Field) {
 	}
 
 	err := createObjTmpl.Execute(out, model)
-	if err != nil {
-		log.Fatal("declareObject: ", err.Error())
-	}
+	checkError(errors.Wrap(err, "declareObject"))
 }
 
 func callMethod(out *os.File, h *handlerTmplModel) {
 	err := callMethodTmpl.Execute(out, h)
-	if err != nil {
-		log.Fatal("callMethod: ", err.Error())
-	}
+	checkError(errors.Wrap(err, "callMethod"))
 }

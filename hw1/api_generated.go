@@ -30,7 +30,6 @@ func writeResponseJSON(w http.ResponseWriter, status int, data interface{}, erro
 }
 
 func (srv *MyApi) wrapperProfile(w http.ResponseWriter, r *http.Request) {
-
 	var Login string
 
 	if r.Method == http.MethodGet {
@@ -75,7 +74,6 @@ func (srv *MyApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
 		writeResponseJSON(w, http.StatusForbidden, nil, "unauthorized")
 		return
 	}
-
 	var Login string
 	var Name string
 	var Status string
@@ -167,7 +165,6 @@ func (srv *OtherApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
 		writeResponseJSON(w, http.StatusForbidden, nil, "unauthorized")
 		return
 	}
-
 	var Username string
 	var Name string
 	var Class string
@@ -254,7 +251,7 @@ func (srv *MyApi) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		default:
 			writeResponseJSON(w, http.StatusNotFound, nil, "unknown method")
 		}
-	}
+}
 
 func (srv *OtherApi) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path { 
@@ -263,4 +260,4 @@ func (srv *OtherApi) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		default:
 			writeResponseJSON(w, http.StatusNotFound, nil, "unknown method")
 		}
-	}
+}
