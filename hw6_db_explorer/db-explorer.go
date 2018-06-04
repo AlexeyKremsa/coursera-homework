@@ -14,6 +14,7 @@ import (
 type DBExplorer struct {
 	db     *sql.DB
 	router *router.Router
+	tables []*Table
 }
 
 func NewDbExplorer(db *sql.DB) (http.Handler, error) {
@@ -46,23 +47,25 @@ func (exp *DBExplorer) loadDBInfo() {
 	}
 
 	// get columns info
-
 	for _, t := range tables {
-		rows, err := exp.db.Query(fmt.Sprintf("SHOW FULL COLUMNS FROM `%s`", t.Name))
+		rows, err := exp.db.Query(fmt.Sprintf("SHOW COLUMNS FROM `%s`", t.Name))
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		//columns := make([]*Column, 0)
+		columns := make([]*ColumnInfo, 0)
 		for rows.Next() {
 			col := &ColumnInfo{}
-			err = rows.Scan(&col.Field, &col.Type, &col.Collation, &col.Null, &col.Key, &col.Default, &col.Extra, &col.Privelegies, &col.Comment)
+			err = rows.Scan(&col.Field, &col.Type, &col.Null, &col.Key, &col.Default, &col.Extra)
 			if err != nil {
 				log.Fatal(err)
 			}
 
-			fmt.Printf("%+v", col)
-			return
+			columns = append(columns, col)
 		}
+
+		t.Columns = append(t.Columns, columns...)
 	}
+
+	exp.tables = tables
 }

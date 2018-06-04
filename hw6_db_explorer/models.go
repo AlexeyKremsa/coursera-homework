@@ -6,7 +6,7 @@ type DBInfo struct {
 
 type Table struct {
 	Name    string
-	Columns []*Column
+	Columns []*ColumnInfo
 }
 
 type Column struct {
@@ -16,13 +16,10 @@ type Column struct {
 }
 
 type ColumnInfo struct {
-	Field       string
-	Type        string
-	Collation   *string
-	Null        string
-	Key         string
-	Default     *string
-	Extra       string
-	Privelegies string
-	Comment     string
+	Field   string
+	Type    string
+	Null    string
+	Key     string
+	Default *string
+	Extra   string
 }
