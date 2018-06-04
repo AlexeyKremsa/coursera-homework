@@ -14,11 +14,11 @@ import (
 type DBExplorer struct {
 	db     *sql.DB
 	router *router.Router
-	tables []*Table
+	tables map[string]*Table
 }
 
 func NewDbExplorer(db *sql.DB) (http.Handler, error) {
-	exp := DBExplorer{db: db, router: router.New()}
+	exp := DBExplorer{db: db, router: router.New(), tables: make(map[string]*Table)}
 	DeclareRoutes(&exp)
 	exp.loadDBInfo()
 	return exp.router, nil
@@ -65,7 +65,6 @@ func (exp *DBExplorer) loadDBInfo() {
 		}
 
 		t.Columns = append(t.Columns, columns...)
+		exp.tables[t.Name] = t
 	}
-
-	exp.tables = tables
 }

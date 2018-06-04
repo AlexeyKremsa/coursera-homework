@@ -6,20 +6,14 @@ import (
 	"strings"
 )
 
-const placeholder = "placeholder"
-
-type route struct {
-	methods []string
-	path    string
-	handler http.HandlerFunc
-}
-
+// Handler is returned based on HTTP method and amount of path params.
+// Example: GET /$table/$id, or GET /$table
 type Router struct {
-	routes map[string]*route
+	getRoutes map[int]http.HandlerFunc
 }
 
 func New() *Router {
-	return &Router{routes: make(map[string]*route)}
+	return &Router{getRoutes: make(map[string]*route)}
 }
 
 func (rt *Router) RegisterRoute(path string, handler http.HandlerFunc, methods ...string) {
@@ -37,7 +31,7 @@ func (rt *Router) RegisterRoute(path string, handler http.HandlerFunc, methods .
 	route.methods = methods
 	route.handler = handler
 
-	rt.routes[path] = route
+	rt.getRoutes[path] = route
 }
 
 func usePlaceholders(path string) string {
@@ -54,7 +48,7 @@ func usePlaceholders(path string) string {
 
 func (rt *Router) getHandler(path string) http.HandlerFunc {
 	path = usePlaceholders(path)
-	route, ok := rt.routes[path]
+	route, ok := rt.getRoutes[path]
 	if !ok {
 		log.Printf("path not registered %s", path)
 		return nil
