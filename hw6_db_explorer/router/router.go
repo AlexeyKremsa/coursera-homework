@@ -95,5 +95,6 @@ func resolveParamsAmount(urlPath string) int {
 	}
 
 	split := strings.Split(urlPath, "/")
-	return len(split)
+	// we do -1 because URL starts with slash and there is a redundant part
+	return len(split) - 1
 }

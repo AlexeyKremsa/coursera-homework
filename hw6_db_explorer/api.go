@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 func DeclareRoutes(exp *DBExplorer) {
@@ -29,7 +30,7 @@ func (exp *DBExplorer) GetAllTables(w http.ResponseWriter, r *http.Request) {
 
 		err = rows.Scan(&tableName)
 		if err != nil {
-			writeResponseJSON(w, http.StatusInternalServerError, err.Error(), "db error")
+			writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
 		}
 
 		resp.Tables = append(resp.Tables, tableName)
@@ -44,7 +45,12 @@ func (exp *DBExplorer) GetRecordsFromTable(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	fmt.Println(r.URL.Path)
+	tableName := strings.TrimPrefix(r.URL.Path, "/")
+	table, ok := exp.tables[tableName]
+	if !ok {
+		writeResponseJSON(w, http.StatusNotFound, nil, fmt.Sprintf("table %s doesn't exist", tableName))
+		return
+	}
 
 	limit := r.URL.Query().Get("limit")
 	if limit == "" {
@@ -57,11 +63,18 @@ func (exp *DBExplorer) GetRecordsFromTable(w http.ResponseWriter, r *http.Reques
 
 	}
 
-	//query := fmt.Sprintf(`SELECT * FROM %s LIMIT %s, %s`, r.URL.Path, limit, offset)
-	//
-	//rows, err := exp.db.Query(query)
-	//if err != nil {
-	//	writeResponseJSON(w, http.StatusInternalServerError, err.Error(), "db error")
-	//}
+	colNames := make([]string, 0)
+	for _, col := range table.Columns {
+		colNames = append(colNames, col.Field)
+	}
+	columns := strings.Join(colNames, ", ")
+	query := fmt.Sprintf(`SELECT %s FROM %s LIMIT %s OFFSET %s`, columns, tableName, limit, offset)
 
+	rows, err := exp.db.Query(query)
+	if err != nil {
+		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+		return
+	}
+
+	writeResponseJSON(w, http.StatusOK, rows, "")
 }

@@ -9,12 +9,6 @@ type Table struct {
 	Columns []*ColumnInfo
 }
 
-type Column struct {
-	Name       string
-	Type       string
-	IsNullable bool
-}
-
 type ColumnInfo struct {
 	Field   string
 	Type    string
