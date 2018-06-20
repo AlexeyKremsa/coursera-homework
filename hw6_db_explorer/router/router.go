@@ -1,67 +1,99 @@
 package router
 
 import (
-	"log"
+	"fmt"
 	"net/http"
 	"strings"
 )
 
 // Handler is returned based on HTTP method and amount of path params.
 // Example: GET /$table/$id, or GET /$table
+// map holds handlers for an appropriate http method and amount of parameters separated by slash
 type Router struct {
-	getRoutes map[int]http.HandlerFunc
+	getRoutes    map[int]http.HandlerFunc
+	postRoutes   map[int]http.HandlerFunc
+	putRoutes    map[int]http.HandlerFunc
+	deleteRoutes map[int]http.HandlerFunc
 }
 
 func New() *Router {
-	return &Router{getRoutes: make(map[string]*route)}
+	return &Router{
+		getRoutes:    make(map[int]http.HandlerFunc),
+		postRoutes:   make(map[int]http.HandlerFunc),
+		putRoutes:    make(map[int]http.HandlerFunc),
+		deleteRoutes: make(map[int]http.HandlerFunc),
+	}
 }
 
-func (rt *Router) RegisterRoute(path string, handler http.HandlerFunc, methods ...string) {
-	if path == "" {
-		return
+func (rt *Router) RegisterRoute(httpMethod string, paramsAmount int, hf http.HandlerFunc) error {
+	switch httpMethod {
+	case "GET":
+		rt.getRoutes[paramsAmount] = hf
+
+	case "POST":
+		rt.postRoutes[paramsAmount] = hf
+
+	case "PUT":
+		rt.putRoutes[paramsAmount] = hf
+
+	case "DELETE":
+		rt.deleteRoutes[paramsAmount] = hf
+
+	default:
+		return fmt.Errorf("unsupported http method: %s", httpMethod)
 	}
 
-	route := &route{}
-	if path == "/" {
-		route.path = path
-	} else {
-		route.path = usePlaceholders(path)
-	}
-
-	route.methods = methods
-	route.handler = handler
-
-	rt.getRoutes[path] = route
-}
-
-func usePlaceholders(path string) string {
-	pathParts := strings.Split(path, "/")
-
-	for _, p := range pathParts {
-		if strings.HasPrefix(p, "{") || strings.HasPrefix(p, "}") {
-			p = placeholder
-		}
-	}
-
-	return strings.Join(pathParts, "/")
-}
-
-func (rt *Router) getHandler(path string) http.HandlerFunc {
-	path = usePlaceholders(path)
-	route, ok := rt.getRoutes[path]
-	if !ok {
-		log.Printf("path not registered %s", path)
-		return nil
-	}
-
-	return route.handler
+	return nil
 }
 
 func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	handler := rt.getHandler(r.URL.Path)
-	if handler == nil {
+	var handler http.HandlerFunc
+	paramsAmount := resolveParamsAmount(r.URL.Path)
+
+	switch r.Method {
+	case "GET":
+		h, ok := rt.getRoutes[paramsAmount]
+		if !ok {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		handler = h
+
+	case "POST":
+		h, ok := rt.postRoutes[paramsAmount]
+		if !ok {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		handler = h
+
+	case "PUT":
+		h, ok := rt.putRoutes[paramsAmount]
+		if !ok {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		handler = h
+
+	case "DELETE":
+		h, ok := rt.deleteRoutes[paramsAmount]
+		if !ok {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		handler = h
+	default:
 		w.WriteHeader(http.StatusNotFound)
 	}
 
 	handler(w, r)
+}
+
+func resolveParamsAmount(urlPath string) int {
+	if urlPath == "/" {
+		return 0
+	}
+
+	split := strings.Split(urlPath, "/")
+	return len(split)
 }

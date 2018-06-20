@@ -6,8 +6,8 @@ import (
 )
 
 func DeclareRoutes(exp *DBExplorer) {
-	exp.router.RegisterRoute("/", exp.GetAllTables, "GET")
-	exp.router.RegisterRoute("/{tableName}", exp.GetRecordsFromTable, "GET")
+	exp.router.RegisterRoute("GET", 0, exp.GetAllTables)
+	exp.router.RegisterRoute("GET", 1, exp.GetRecordsFromTable)
 }
 
 func (exp *DBExplorer) GetAllTables(w http.ResponseWriter, r *http.Request) {
