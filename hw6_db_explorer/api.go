@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -52,15 +53,14 @@ func (exp *DBExplorer) GetRecordsFromTable(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	limit := r.URL.Query().Get("limit")
-	if limit == "" {
-		limit = "5"
+	limit, err := strconv.ParseInt(r.URL.Query().Get("limit"), 0, 32)
+	if err != nil {
+		limit = 5
 	}
 
-	offset := r.URL.Query().Get("offset")
-	if offset == "" {
-		offset = "0"
-
+	offset, err := strconv.ParseInt(r.URL.Query().Get("offset"), 0, 32)
+	if err != nil {
+		offset = 0
 	}
 
 	colNames := make([]string, 0)
@@ -68,13 +68,46 @@ func (exp *DBExplorer) GetRecordsFromTable(w http.ResponseWriter, r *http.Reques
 		colNames = append(colNames, col.Field)
 	}
 	columns := strings.Join(colNames, ", ")
-	query := fmt.Sprintf(`SELECT %s FROM %s LIMIT %s OFFSET %s`, columns, tableName, limit, offset)
+
+	query := fmt.Sprintf(`SELECT %s FROM %s LIMIT %d OFFSET %d`, columns, tableName, limit, offset)
 
 	rows, err := exp.db.Query(query)
 	if err != nil {
 		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
 		return
 	}
+	defer rows.Close()
 
-	writeResponseJSON(w, http.StatusOK, rows, "")
+	colsToRead := make([]interface{}, 0)
+	colTypes, err := rows.ColumnTypes()
+	if err != nil {
+		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+		return
+	}
+
+	for _, item := range colTypes {
+		col, err := getVariable(item.DatabaseTypeName())
+		if err != nil {
+			writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+			return
+		}
+		colsToRead = append(colsToRead, col)
+	}
+
+	for rows.Next() {
+		err = rows.Scan(colsToRead...)
+		if err != nil {
+			writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+			return
+		}
+	}
+
+	resp, err := prepareResponse(colsToRead, colNames)
+	if err != nil {
+		if err != nil {
+			writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+			return
+		}
+	}
+	writeResponseJSON(w, http.StatusOK, resp, "")
 }

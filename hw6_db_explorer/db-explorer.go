@@ -8,6 +8,8 @@ import (
 
 	"fmt"
 
+	"reflect"
+
 	"github.com/AlexeyKremsa/coursera-homework/hw6_db_explorer/router"
 )
 
@@ -67,4 +69,42 @@ func (exp *DBExplorer) loadDBInfo() {
 		t.Columns = append(t.Columns, columns...)
 		exp.tables[t.Name] = t
 	}
+}
+
+func getVariable(varType string) (interface{}, error) {
+	var varInt int
+	var varString sql.NullString
+	switch varType {
+	case "INT":
+		return &varInt, nil
+
+	case "VARCHAR", "TEXT":
+		return &varString, nil
+
+	default:
+		return nil, fmt.Errorf("unsupported type: %s", varType)
+	}
+}
+
+func prepareResponse(data []interface{}, colNames []string) (map[string]interface{}, error) {
+	resp := make(map[string]interface{})
+
+	for i := 0; i < len(data); i++ {
+		switch v := data[i].(type) {
+		case *int:
+			resp[colNames[i]] = v
+
+		case *sql.NullString:
+			if v.Valid {
+				resp[colNames[i]] = v.String
+			} else {
+				resp[colNames[i]] = nil
+			}
+
+		default:
+			return nil, fmt.Errorf("unsupported type: %s", reflect.TypeOf(v).String())
+		}
+	}
+
+	return resp, nil
 }
