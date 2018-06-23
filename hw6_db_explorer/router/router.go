@@ -25,6 +25,8 @@ func New() *Router {
 	}
 }
 
+// RegisterRoute registers a route depending on amount of params in URL
+// Example: 1 param - /$table?limit=5&offset=7, 2 params - /$table/$id
 func (rt *Router) RegisterRoute(httpMethod string, paramsAmount int, hf http.HandlerFunc) error {
 	switch httpMethod {
 	case "GET":

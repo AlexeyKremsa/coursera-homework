@@ -10,6 +10,7 @@ import (
 func DeclareRoutes(exp *DBExplorer) {
 	exp.router.RegisterRoute("GET", 0, exp.GetAllTables)
 	exp.router.RegisterRoute("GET", 1, exp.GetRecordsFromTable)
+	exp.router.RegisterRoute("GET", 2, exp.GetRecordByID)
 }
 
 func (exp *DBExplorer) GetAllTables(w http.ResponseWriter, r *http.Request) {
@@ -63,6 +64,7 @@ func (exp *DBExplorer) GetRecordsFromTable(w http.ResponseWriter, r *http.Reques
 		offset = 0
 	}
 
+	// select all columns
 	colNames := make([]string, 0)
 	for _, col := range table.Columns {
 		colNames = append(colNames, col.Field)
@@ -71,47 +73,10 @@ func (exp *DBExplorer) GetRecordsFromTable(w http.ResponseWriter, r *http.Reques
 
 	query := fmt.Sprintf(`SELECT %s FROM %s LIMIT %d OFFSET %d`, columns, tableName, limit, offset)
 
-	rows, err := exp.db.Query(query)
+	resp, err := exp.ExecuteQuery(query, colNames)
 	if err != nil {
 		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
 		return
-	}
-	defer rows.Close()
-
-	colsToRead := make([]interface{}, 0)
-	colTypes, err := rows.ColumnTypes()
-	if err != nil {
-		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
-		return
-	}
-
-	for _, item := range colTypes {
-		// we need proper variables to read data
-		col, err := getVariable(item.DatabaseTypeName())
-		if err != nil {
-			writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
-			return
-		}
-		colsToRead = append(colsToRead, col)
-	}
-
-	resp := make([]map[string]interface{}, 0)
-	for rows.Next() {
-		err = rows.Scan(colsToRead...)
-		if err != nil {
-			writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
-			return
-		}
-
-		rowData, err := prepareResponse(colsToRead, colNames)
-		if err != nil {
-			if err != nil {
-				writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
-				return
-			}
-		}
-
-		resp = append(resp, rowData)
 	}
 
 	writeResponseJSON(w, http.StatusOK, resp, "")
@@ -122,4 +87,45 @@ func (exp *DBExplorer) GetRecordByID(w http.ResponseWriter, r *http.Request) {
 		writeResponseJSON(w, http.StatusNotAcceptable, nil, "bad method")
 		return
 	}
+
+	params := strings.Split(r.URL.Path, "/")
+	if len(params) != 3 {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "invalid URL")
+		return
+	}
+
+	tableName := params[1]
+	id, err := strconv.Atoi(params[2])
+	if err != nil {
+		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+		return
+	}
+
+	table, ok := exp.tables[tableName]
+	if !ok {
+		writeResponseJSON(w, http.StatusNotFound, nil, fmt.Sprintf("table %s doesn't exist", tableName))
+		return
+	}
+
+	// select all columns
+	colNames := make([]string, 0)
+	for _, col := range table.Columns {
+		colNames = append(colNames, col.Field)
+	}
+	columns := strings.Join(colNames, ", ")
+
+	query := fmt.Sprintf(`SELECT %s FROM %s WHERE id = %d`, columns, tableName, id)
+
+	resp, err := exp.ExecuteQuery(query, colNames)
+	if err != nil {
+		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+		return
+	}
+
+	if len(resp) == 0 {
+		writeResponseJSON(w, http.StatusNotFound, nil, "")
+		return
+	}
+
+	writeResponseJSON(w, http.StatusOK, resp, "")
 }
