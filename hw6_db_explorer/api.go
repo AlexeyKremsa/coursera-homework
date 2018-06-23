@@ -86,6 +86,7 @@ func (exp *DBExplorer) GetRecordsFromTable(w http.ResponseWriter, r *http.Reques
 	}
 
 	for _, item := range colTypes {
+		// we need proper variables to read data
 		col, err := getVariable(item.DatabaseTypeName())
 		if err != nil {
 			writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
@@ -94,20 +95,31 @@ func (exp *DBExplorer) GetRecordsFromTable(w http.ResponseWriter, r *http.Reques
 		colsToRead = append(colsToRead, col)
 	}
 
+	resp := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		err = rows.Scan(colsToRead...)
 		if err != nil {
 			writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
 			return
 		}
+
+		rowData, err := prepareResponse(colsToRead, colNames)
+		if err != nil {
+			if err != nil {
+				writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+				return
+			}
+		}
+
+		resp = append(resp, rowData)
 	}
 
-	resp, err := prepareResponse(colsToRead, colNames)
-	if err != nil {
-		if err != nil {
-			writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
-			return
-		}
-	}
 	writeResponseJSON(w, http.StatusOK, resp, "")
+}
+
+func (exp *DBExplorer) GetRecordByID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeResponseJSON(w, http.StatusNotAcceptable, nil, "bad method")
+		return
+	}
 }

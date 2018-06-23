@@ -87,7 +87,7 @@ func getVariable(varType string) (interface{}, error) {
 }
 
 func prepareResponse(data []interface{}, colNames []string) (map[string]interface{}, error) {
-	resp := make(map[string]interface{})
+	resp := make(map[string]interface{}, 0)
 
 	for i := 0; i < len(data); i++ {
 		switch v := data[i].(type) {
