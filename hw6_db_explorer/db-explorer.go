@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"net/http"
+	"strings"
 
 	"log"
 
@@ -58,9 +59,17 @@ func (exp *DBExplorer) loadDBInfo() {
 		columns := make([]*ColumnInfo, 0)
 		for rows.Next() {
 			col := &ColumnInfo{}
-			err = rows.Scan(&col.Field, &col.Type, &col.Null, &col.Key, &col.Default, &col.Extra)
+			// need string here to read value and convert it from string to bool
+			var isNull string
+			err = rows.Scan(&col.Field, &col.Type, &isNull, &col.Key, &col.Default, &col.Extra)
 			if err != nil {
 				log.Fatal(err)
+			}
+
+			if isNull == "YES" {
+				col.Null = true
+			} else {
+				col.Null = false
 			}
 
 			columns = append(columns, col)
@@ -107,4 +116,29 @@ func prepareResponse(data []interface{}, colNames []string) (map[string]interfac
 	}
 
 	return resp, nil
+}
+
+func prepareDataToInsert(r *http.Request, columns []*ColumnInfo) ([]interface{}, string, error) {
+
+	colNames := make([]string, 0)
+	dataToInsert := make([]interface{}, 0)
+
+	// start with skipping 1st element, normally it`s an id
+	for i := 1; i < len(columns); i++ {
+		colNames = append(colNames, columns[i].Field)
+
+		val := r.FormValue(columns[i].Field)
+		if val == "" && !columns[i].Null {
+			return nil, "", fmt.Errorf("%s is empty", columns[i].Field)
+		}
+
+		if val == "" && columns[i].Null {
+			val = "null"
+		}
+
+		dataToInsert = append(dataToInsert, val)
+	}
+	columnsStr := strings.Join(colNames, ", ")
+
+	return dataToInsert, columnsStr, nil
 }

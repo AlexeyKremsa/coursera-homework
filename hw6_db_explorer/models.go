@@ -12,7 +12,7 @@ type Table struct {
 type ColumnInfo struct {
 	Field   string
 	Type    string
-	Null    string
+	Null    bool
 	Key     string
 	Default *string
 	Extra   string

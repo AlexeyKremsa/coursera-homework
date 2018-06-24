@@ -11,6 +11,7 @@ func DeclareRoutes(exp *DBExplorer) {
 	exp.router.RegisterRoute("GET", 0, exp.GetAllTables)
 	exp.router.RegisterRoute("GET", 1, exp.GetRecordsFromTable)
 	exp.router.RegisterRoute("GET", 2, exp.GetRecordByID)
+	exp.router.RegisterRoute("PUT", 1, exp.CreateRecord)
 }
 
 func (exp *DBExplorer) GetAllTables(w http.ResponseWriter, r *http.Request) {
@@ -128,4 +129,35 @@ func (exp *DBExplorer) GetRecordByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeResponseJSON(w, http.StatusOK, resp, "")
+}
+
+func (exp *DBExplorer) CreateRecord(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		writeResponseJSON(w, http.StatusNotAcceptable, nil, "bad method")
+		return
+	}
+
+	tableName := strings.TrimPrefix(r.URL.Path, "/")
+	table, ok := exp.tables[tableName]
+	if !ok {
+		writeResponseJSON(w, http.StatusNotFound, nil, fmt.Sprintf("table %s doesn't exist", tableName))
+		return
+	}
+
+	dataToInsert, columnsStr, err := prepareDataToInsert(r, table.Columns)
+	if err != nil {
+		writeResponseJSON(w, http.StatusBadRequest, nil, err.Error())
+		return
+	}
+
+	placeholders := "?" + strings.Repeat(", ?", len(dataToInsert)-1)
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", tableName, columnsStr, placeholders)
+
+	_, err = exp.db.Exec(query, dataToInsert...)
+	if err != nil {
+		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+		return
+	}
+
+	writeResponseJSON(w, http.StatusOK, nil, "")
 }
