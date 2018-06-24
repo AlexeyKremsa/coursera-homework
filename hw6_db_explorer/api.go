@@ -12,6 +12,7 @@ func DeclareRoutes(exp *DBExplorer) {
 	exp.router.RegisterRoute("GET", 1, exp.GetRecordsFromTable)
 	exp.router.RegisterRoute("GET", 2, exp.GetRecordByID)
 	exp.router.RegisterRoute("PUT", 1, exp.CreateRecord)
+	exp.router.RegisterRoute("DELETE", 2, exp.DeleteRecord)
 }
 
 func (exp *DBExplorer) GetAllTables(w http.ResponseWriter, r *http.Request) {
@@ -154,6 +155,42 @@ func (exp *DBExplorer) CreateRecord(w http.ResponseWriter, r *http.Request) {
 	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", tableName, columnsStr, placeholders)
 
 	_, err = exp.db.Exec(query, dataToInsert...)
+	if err != nil {
+		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+		return
+	}
+
+	writeResponseJSON(w, http.StatusOK, nil, "")
+}
+
+func (exp *DBExplorer) DeleteRecord(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		writeResponseJSON(w, http.StatusNotAcceptable, nil, "bad method")
+		return
+	}
+
+	params := strings.Split(r.URL.Path, "/")
+	if len(params) != 3 {
+		writeResponseJSON(w, http.StatusBadRequest, nil, "invalid URL")
+		return
+	}
+
+	tableName := params[1]
+	id, err := strconv.Atoi(params[2])
+	if err != nil {
+		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+		return
+	}
+
+	table, ok := exp.tables[tableName]
+	if !ok {
+		writeResponseJSON(w, http.StatusNotFound, nil, fmt.Sprintf("table %s doesn't exist", tableName))
+		return
+	}
+
+	query := fmt.Sprintf("DELETE FROM %s WHERE id = ?", table.Name)
+
+	_, err = exp.db.Exec(query, id)
 	if err != nil {
 		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
 		return

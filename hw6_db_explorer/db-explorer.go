@@ -138,6 +138,7 @@ func prepareDataToInsert(r *http.Request, columns []*ColumnInfo) ([]interface{},
 
 		dataToInsert = append(dataToInsert, val)
 	}
+
 	columnsStr := strings.Join(colNames, ", ")
 
 	return dataToInsert, columnsStr, nil
