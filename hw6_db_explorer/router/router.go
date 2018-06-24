@@ -85,7 +85,7 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		handler = h
 	default:
-		w.WriteHeader(http.StatusNotFound)
+		w.WriteHeader(http.StatusNotImplemented)
 	}
 
 	handler(w, r)
