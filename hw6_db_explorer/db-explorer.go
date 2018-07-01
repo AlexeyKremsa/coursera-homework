@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"net/http"
-	"strings"
 
 	"log"
 
@@ -116,30 +115,4 @@ func prepareResponse(data []interface{}, colNames []string) (map[string]interfac
 	}
 
 	return resp, nil
-}
-
-func prepareDataToInsert(r *http.Request, columns []*ColumnInfo) ([]interface{}, string, error) {
-
-	colNames := make([]string, 0)
-	dataToInsert := make([]interface{}, 0)
-
-	// start with skipping 1st element, normally it`s an id
-	for i := 1; i < len(columns); i++ {
-		colNames = append(colNames, columns[i].Field)
-
-		val := r.FormValue(columns[i].Field)
-		if val == "" && !columns[i].Null {
-			return nil, "", fmt.Errorf("%s is empty", columns[i].Field)
-		}
-
-		if val == "" && columns[i].Null {
-			val = "null"
-		}
-
-		dataToInsert = append(dataToInsert, val)
-	}
-
-	columnsStr := strings.Join(colNames, ", ")
-
-	return dataToInsert, columnsStr, nil
 }
