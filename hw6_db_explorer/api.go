@@ -19,42 +19,41 @@ func DeclareRoutes(exp *DBExplorer) {
 
 func (exp *DBExplorer) GetAllTables(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		writeResponseJSON(w, http.StatusMethodNotAllowed, nil, "bad method")
+		writeResponseJSON(w, http.StatusMethodNotAllowed, "", nil, "bad method")
 		return
 	}
 
 	rows, err := exp.db.Query("SHOW TABLES")
 	if err != nil {
-		writeResponseJSON(w, http.StatusInternalServerError, err.Error(), "db error")
+		writeResponseJSON(w, http.StatusInternalServerError, "", nil, err.Error())
 	}
 
-	resp := TablesResp{}
-	resp.Tables = make([]string, 0)
+	resp := make([]string, 0)
 
 	for rows.Next() {
 		var tableName string
 
 		err = rows.Scan(&tableName)
 		if err != nil {
-			writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+			writeResponseJSON(w, http.StatusInternalServerError, "", nil, err.Error())
 		}
 
-		resp.Tables = append(resp.Tables, tableName)
+		resp = append(resp, tableName)
 	}
 
-	writeResponseJSON(w, http.StatusOK, resp, "")
+	writeResponseJSON(w, http.StatusOK, "tables", resp, "")
 }
 
 func (exp *DBExplorer) GetRecordsFromTable(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		writeResponseJSON(w, http.StatusMethodNotAllowed, nil, "bad method")
+		writeResponseJSON(w, http.StatusMethodNotAllowed, "", nil, "bad method")
 		return
 	}
 
 	tableName := strings.TrimPrefix(r.URL.Path, "/")
 	table, ok := exp.tables[tableName]
 	if !ok {
-		writeResponseJSON(w, http.StatusNotFound, nil, fmt.Sprintf("table %s doesn't exist", tableName))
+		writeResponseJSON(w, http.StatusNotFound, "", nil, "unknown table")
 		return
 	}
 
@@ -68,116 +67,105 @@ func (exp *DBExplorer) GetRecordsFromTable(w http.ResponseWriter, r *http.Reques
 		offset = 0
 	}
 
-	// select all columns
-	colNames := make([]string, 0)
-	for _, col := range table.Columns {
-		colNames = append(colNames, col.Field)
-	}
-	columns := strings.Join(colNames, ", ")
-
-	query := fmt.Sprintf(`SELECT %s FROM %s LIMIT %d OFFSET %d`, columns, tableName, limit, offset)
-
-	resp, err := exp.ExecuteQuery(query, colNames)
+	resp, err := exp.getRecords(limit, offset, table)
 	if err != nil {
-		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+		writeResponseJSON(w, http.StatusInternalServerError, "", nil, err.Error())
 		return
 	}
 
-	writeResponseJSON(w, http.StatusOK, resp, "")
+	writeResponseJSON(w, http.StatusOK, "records", resp, "")
 }
 
 func (exp *DBExplorer) GetRecordByID(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		writeResponseJSON(w, http.StatusMethodNotAllowed, nil, "bad method")
+		writeResponseJSON(w, http.StatusMethodNotAllowed, "", nil, "bad method")
 		return
 	}
 
 	params := strings.Split(r.URL.Path, "/")
 	if len(params) != 3 {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "invalid URL")
+		writeResponseJSON(w, http.StatusBadRequest, "", nil, "invalid URL")
 		return
 	}
 
 	tableName := params[1]
 	id, err := strconv.Atoi(params[2])
 	if err != nil {
-		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+		writeResponseJSON(w, http.StatusInternalServerError, "", nil, err.Error())
 		return
 	}
 
 	table, ok := exp.tables[tableName]
 	if !ok {
-		writeResponseJSON(w, http.StatusNotFound, nil, fmt.Sprintf("table %s doesn't exist", tableName))
+		writeResponseJSON(w, http.StatusNotFound, "", nil, fmt.Sprintf("table %s doesn't exist", tableName))
 		return
 	}
 
-	// select all columns
-	colNames := make([]string, 0)
-	for _, col := range table.Columns {
-		colNames = append(colNames, col.Field)
-	}
-	columns := strings.Join(colNames, ", ")
-
-	query := fmt.Sprintf(`SELECT %s FROM %s WHERE id = %d`, columns, tableName, id)
-
-	resp, err := exp.ExecuteQuery(query, colNames)
+	resp, err := exp.getRecordByID(id, table)
 	if err != nil {
-		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+		writeResponseJSON(w, http.StatusInternalServerError, "", nil, err.Error())
 		return
 	}
 
 	if len(resp) == 0 {
-		writeResponseJSON(w, http.StatusNotFound, nil, "")
+		writeResponseJSON(w, http.StatusNotFound, "", nil, "record not found")
 		return
 	}
 
-	writeResponseJSON(w, http.StatusOK, resp, "")
+	writeResponseJSON(w, http.StatusOK, "record", resp[0], "")
 }
 
 func (exp *DBExplorer) CreateRecord(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
-		writeResponseJSON(w, http.StatusMethodNotAllowed, nil, "bad method")
+		writeResponseJSON(w, http.StatusMethodNotAllowed, "", nil, "bad method")
 		return
 	}
 
 	tableName := strings.TrimPrefix(r.URL.Path, "/")
 	table, ok := exp.tables[tableName]
 	if !ok {
-		writeResponseJSON(w, http.StatusNotFound, nil, fmt.Sprintf("table %s doesn't exist", tableName))
+		writeResponseJSON(w, http.StatusNotFound, "", nil, fmt.Sprintf("table %s doesn't exist", tableName))
 		return
 	}
 
-	err := exp.insert(r, table.Columns, tableName)
+	data := make(map[string]string)
+	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
-		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+		writeResponseJSON(w, http.StatusInternalServerError, "", nil, err.Error())
 		return
 	}
 
-	writeResponseJSON(w, http.StatusOK, nil, "")
+	lastID, err := exp.insert(data, table.Columns, tableName)
+	if err != nil {
+		writeResponseJSON(w, http.StatusInternalServerError, "", nil, err.Error())
+		return
+	}
+
+	writeResponseJSON(w, http.StatusOK, "id", lastID, "")
 }
 
 func (exp *DBExplorer) DeleteRecord(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
-		writeResponseJSON(w, http.StatusMethodNotAllowed, nil, "bad method")
+		writeResponseJSON(w, http.StatusMethodNotAllowed, "", nil, "bad method")
 		return
 	}
 
 	params := strings.Split(r.URL.Path, "/")
 	if len(params) != 3 {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "invalid URL")
+		writeResponseJSON(w, http.StatusBadRequest, "", nil, "invalid URL")
 		return
 	}
 
 	tableName := params[1]
 	id, err := strconv.Atoi(params[2])
 	if err != nil {
-		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+		writeResponseJSON(w, http.StatusInternalServerError, "", nil, err.Error())
 		return
 	}
 
 	table, ok := exp.tables[tableName]
 	if !ok {
-		writeResponseJSON(w, http.StatusNotFound, nil, fmt.Sprintf("table %s doesn't exist", tableName))
+		writeResponseJSON(w, http.StatusNotFound, "", nil, fmt.Sprintf("table %s doesn't exist", tableName))
 		return
 	}
 
@@ -185,50 +173,50 @@ func (exp *DBExplorer) DeleteRecord(w http.ResponseWriter, r *http.Request) {
 
 	_, err = exp.db.Exec(query, id)
 	if err != nil {
-		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+		writeResponseJSON(w, http.StatusInternalServerError, "", nil, err.Error())
 		return
 	}
 
-	writeResponseJSON(w, http.StatusOK, nil, "")
+	writeResponseJSON(w, http.StatusOK, "", nil, "")
 }
 
 func (exp *DBExplorer) UpdateRecord(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		writeResponseJSON(w, http.StatusMethodNotAllowed, nil, "bad method")
+		writeResponseJSON(w, http.StatusMethodNotAllowed, "", nil, "bad method")
 		return
 	}
 
 	params := strings.Split(r.URL.Path, "/")
 	if len(params) != 3 {
-		writeResponseJSON(w, http.StatusBadRequest, nil, "invalid URL")
+		writeResponseJSON(w, http.StatusBadRequest, "", nil, "invalid URL")
 		return
 	}
 
 	tableName := params[1]
 	id, err := strconv.Atoi(params[2])
 	if err != nil {
-		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+		writeResponseJSON(w, http.StatusInternalServerError, "", nil, err.Error())
 		return
 	}
 
 	table, ok := exp.tables[tableName]
 	if !ok {
-		writeResponseJSON(w, http.StatusNotFound, nil, fmt.Sprintf("table %s doesn't exist", tableName))
+		writeResponseJSON(w, http.StatusNotFound, "", nil, fmt.Sprintf("table %s doesn't exist", tableName))
 		return
 	}
 
 	data := make(map[string]string)
 	err = json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
-		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+		writeResponseJSON(w, http.StatusInternalServerError, "", nil, err.Error())
 		return
 	}
 
 	err = exp.update(id, data, table.Columns, tableName)
 	if err != nil {
-		writeResponseJSON(w, http.StatusInternalServerError, nil, err.Error())
+		writeResponseJSON(w, http.StatusInternalServerError, "", nil, err.Error())
 		return
 	}
 
-	writeResponseJSON(w, http.StatusOK, nil, "")
+	writeResponseJSON(w, http.StatusOK, "", nil, "")
 }

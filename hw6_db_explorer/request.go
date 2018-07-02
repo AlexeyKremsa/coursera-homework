@@ -1,5 +1,5 @@
 package main
 
-type updateRequest struct {
+type request struct {
 	data map[string]string
 }

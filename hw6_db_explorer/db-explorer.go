@@ -100,7 +100,7 @@ func prepareResponse(data []interface{}, colNames []string) (map[string]interfac
 	for i := 0; i < len(data); i++ {
 		switch v := data[i].(type) {
 		case *int:
-			resp[colNames[i]] = v
+			resp[colNames[i]] = *v
 
 		case *sql.NullString:
 			if v.Valid {
