@@ -118,17 +118,6 @@ func prepareResponse(data []interface{}, colNames []string) (map[string]interfac
 	return resp, nil
 }
 
-func checkIDUpdate(data map[string]interface{}) error {
-	if len(data) == 1 {
-		_, ok := data["id"]
-		if ok {
-			return errors.New("field id have invalid type")
-		}
-	}
-
-	return nil
-}
-
 func validateFields(data map[string]interface{}, table *Table) error {
 	if len(data) == 1 {
 		_, ok := data["id"]
