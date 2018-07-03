@@ -50,7 +50,7 @@ func (exp *DBExplorer) GetRecordsFromTable(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	tableName := strings.TrimPrefix(r.URL.Path, "/")
+	tableName := strings.Trim(r.URL.Path, "/")
 	table, ok := exp.tables[tableName]
 	if !ok {
 		writeResponseJSON(w, http.StatusNotFound, "", nil, "unknown table")
@@ -67,7 +67,7 @@ func (exp *DBExplorer) GetRecordsFromTable(w http.ResponseWriter, r *http.Reques
 		offset = 0
 	}
 
-	resp, err := exp.getRecords(limit, offset, table)
+	resp, err := exp.getAll(limit, offset, table)
 	if err != nil {
 		writeResponseJSON(w, http.StatusInternalServerError, "", nil, err.Error())
 		return
@@ -101,7 +101,7 @@ func (exp *DBExplorer) GetRecordByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := exp.getRecordByID(id, table)
+	resp, err := exp.getByID(id, table)
 	if err != nil {
 		writeResponseJSON(w, http.StatusInternalServerError, "", nil, err.Error())
 		return
@@ -121,14 +121,14 @@ func (exp *DBExplorer) CreateRecord(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tableName := strings.TrimPrefix(r.URL.Path, "/")
+	tableName := strings.Trim(r.URL.Path, "/")
 	table, ok := exp.tables[tableName]
 	if !ok {
 		writeResponseJSON(w, http.StatusNotFound, "", nil, fmt.Sprintf("table %s doesn't exist", tableName))
 		return
 	}
 
-	data := make(map[string]string)
+	data := make(map[string]interface{})
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
 		writeResponseJSON(w, http.StatusInternalServerError, "", nil, err.Error())
@@ -141,7 +141,7 @@ func (exp *DBExplorer) CreateRecord(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeResponseJSON(w, http.StatusOK, "id", lastID, "")
+	writeResponseJSON(w, http.StatusOK, table.Columns[0].Field, lastID, "")
 }
 
 func (exp *DBExplorer) DeleteRecord(w http.ResponseWriter, r *http.Request) {
@@ -169,15 +169,13 @@ func (exp *DBExplorer) DeleteRecord(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := fmt.Sprintf("DELETE FROM %s WHERE id = ?", table.Name)
-
-	_, err = exp.db.Exec(query, id)
+	rowsAffected, err := exp.delete(id, table)
 	if err != nil {
 		writeResponseJSON(w, http.StatusInternalServerError, "", nil, err.Error())
 		return
 	}
 
-	writeResponseJSON(w, http.StatusOK, "", nil, "")
+	writeResponseJSON(w, http.StatusOK, "deleted", rowsAffected, "")
 }
 
 func (exp *DBExplorer) UpdateRecord(w http.ResponseWriter, r *http.Request) {
@@ -205,18 +203,24 @@ func (exp *DBExplorer) UpdateRecord(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := make(map[string]string)
+	data := make(map[string]interface{})
 	err = json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
 		writeResponseJSON(w, http.StatusInternalServerError, "", nil, err.Error())
 		return
 	}
 
-	err = exp.update(id, data, table.Columns, tableName)
+	err = validateFields(data, table)
+	if err != nil {
+		writeResponseJSON(w, http.StatusBadRequest, "", nil, err.Error())
+		return
+	}
+
+	rowsAffected, err := exp.update(id, data, table.Columns, tableName)
 	if err != nil {
 		writeResponseJSON(w, http.StatusInternalServerError, "", nil, err.Error())
 		return
 	}
 
-	writeResponseJSON(w, http.StatusOK, "", nil, "")
+	writeResponseJSON(w, http.StatusOK, "updated", rowsAffected, "")
 }

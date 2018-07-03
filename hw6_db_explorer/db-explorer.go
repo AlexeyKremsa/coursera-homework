@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"net/http"
 
 	"log"
@@ -115,4 +116,59 @@ func prepareResponse(data []interface{}, colNames []string) (map[string]interfac
 	}
 
 	return resp, nil
+}
+
+func checkIDUpdate(data map[string]interface{}) error {
+	if len(data) == 1 {
+		_, ok := data["id"]
+		if ok {
+			return errors.New("field id have invalid type")
+		}
+	}
+
+	return nil
+}
+
+func validateFields(data map[string]interface{}, table *Table) error {
+	if len(data) == 1 {
+		_, ok := data["id"]
+		if ok {
+			return errors.New("field id have invalid type")
+		}
+	}
+
+	for _, column := range table.Columns {
+		val, ok := data[column.Field]
+		if !ok {
+			continue
+		}
+
+		if val == nil && column.Null {
+			return nil
+		}
+
+		if val == nil && !column.Null {
+			return fmt.Errorf("field %s have invalid type", column.Field)
+		}
+
+		if !compareTypes(column.Type, reflect.TypeOf(val).Name()) {
+			return fmt.Errorf("field %s have invalid type", column.Field)
+		}
+	}
+
+	return nil
+}
+
+func compareTypes(colType, fieldType string) bool {
+	switch fieldType {
+	case "string":
+		if colType == "varchar(255)" || colType == "text" {
+			return true
+		}
+
+	default:
+		return false
+	}
+
+	return false
 }

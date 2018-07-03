@@ -47,29 +47,24 @@ func (exp *DBExplorer) ExecuteQuery(query string, colNames []string) ([]map[stri
 	return resp, nil
 }
 
-func (exp *DBExplorer) insert(data map[string]string, columns []*ColumnInfo, tableName string) (int64, error) {
+func (exp *DBExplorer) insert(data map[string]interface{}, columns []*ColumnInfo, tableName string) (int64, error) {
 	colNames := make([]string, 0)
 	values := make([]interface{}, 0)
 
-	// // skip 1st element, normally it`s an id
-	// for i := 1; i < len(columns); i++ {
-	// 	colNames = append(colNames, columns[i].Field)
+	// skip 1st element, normally it`s an id
+	for i := 1; i < len(columns); i++ {
+		colNames = append(colNames, columns[i].Field)
 
-	// 	val := r.FormValue(columns[i].Field)
-	// 	if val == "" && !columns[i].Null {
-	// 		return fmt.Errorf("%s is empty", columns[i].Field)
-	// 	}
+		val, ok := data[columns[i].Field]
+		if !ok {
+			if columns[i].Null {
+				val = nil
+			} else {
+				val = ""
+			}
+		}
 
-	// 	if val == "" && columns[i].Null {
-	// 		val = "null"
-	// 	}
-
-	// 	dataToInsert = append(dataToInsert, val)
-	// }
-
-	for k, v := range data {
-		colNames = append(colNames, k)
-		values = append(values, v)
+		values = append(values, val)
 	}
 
 	columnsStr := strings.Join(colNames, ", ")
@@ -80,11 +75,10 @@ func (exp *DBExplorer) insert(data map[string]string, columns []*ColumnInfo, tab
 		return -1, err
 	}
 
-	lastID, err := res.LastInsertId()
-	return lastID, err
+	return res.LastInsertId()
 }
 
-func (exp *DBExplorer) update(id int, data map[string]string, columns []*ColumnInfo, tableName string) error {
+func (exp *DBExplorer) update(id int, data map[string]interface{}, columns []*ColumnInfo, tableName string) (int64, error) {
 	setStmts := make([]string, 0)
 	values := make([]interface{}, 0)
 
@@ -93,13 +87,17 @@ func (exp *DBExplorer) update(id int, data map[string]string, columns []*ColumnI
 		values = append(values, v)
 	}
 
-	query := fmt.Sprintf("UPDATE %s SET %s WHERE ID = %d", tableName, strings.Join(setStmts, ", "), id)
-	_, err := exp.db.Exec(query, values...)
+	query := fmt.Sprintf("UPDATE %s SET %s WHERE %s = %d", tableName, strings.Join(setStmts, ", "), columns[0].Field, id)
+	fmt.Println(query)
+	res, err := exp.db.Exec(query, values...)
+	if err != nil {
+		return -1, err
+	}
 
-	return err
+	return res.RowsAffected()
 }
 
-func (exp *DBExplorer) getRecords(limit, offset int64, table *Table) ([]map[string]interface{}, error) {
+func (exp *DBExplorer) getAll(limit, offset int64, table *Table) ([]map[string]interface{}, error) {
 	// select all columns
 	colNames := make([]string, 0)
 	for _, col := range table.Columns {
@@ -113,7 +111,7 @@ func (exp *DBExplorer) getRecords(limit, offset int64, table *Table) ([]map[stri
 	return resp, err
 }
 
-func (exp *DBExplorer) getRecordByID(id int, table *Table) ([]map[string]interface{}, error) {
+func (exp *DBExplorer) getByID(id int, table *Table) ([]map[string]interface{}, error) {
 	// select all columns
 	colNames := make([]string, 0)
 	for _, col := range table.Columns {
@@ -121,9 +119,20 @@ func (exp *DBExplorer) getRecordByID(id int, table *Table) ([]map[string]interfa
 	}
 	columns := strings.Join(colNames, ", ")
 
-	query := fmt.Sprintf(`SELECT %s FROM %s WHERE id = %d`, columns, table.Name, id)
+	query := fmt.Sprintf(`SELECT %s FROM %s WHERE %s = %d`, columns, table.Name, table.Columns[0].Field, id)
 
 	resp, err := exp.ExecuteQuery(query, colNames)
 
 	return resp, err
+}
+
+func (exp *DBExplorer) delete(id int, table *Table) (int64, error) {
+	query := fmt.Sprintf("DELETE FROM %s WHERE %s = ?", table.Name, table.Columns[0].Field)
+
+	res, err := exp.db.Exec(query, id)
+	if err != nil {
+		return -1, err
+	}
+
+	return res.RowsAffected()
 }
