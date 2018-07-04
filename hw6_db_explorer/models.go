@@ -1,19 +1,15 @@
 package main
 
-type DBInfo struct {
-	Tables []*Table
+type tableInfo struct {
+	name    string
+	columns []*columnInfo
 }
 
-type Table struct {
-	Name    string
-	Columns []*ColumnInfo
-}
-
-type ColumnInfo struct {
-	Field   string
-	Type    string
-	Null    bool
-	Key     string
-	Default *string
-	Extra   string
+type columnInfo struct {
+	field      string
+	typeName   string
+	isNull     bool
+	key        string
+	defaultVal *string
+	extra      string
 }

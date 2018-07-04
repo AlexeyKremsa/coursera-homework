@@ -8,16 +8,16 @@ import (
 	"strings"
 )
 
-func DeclareRoutes(exp *DBExplorer) {
-	exp.router.RegisterRoute("GET", 0, exp.GetAllTables)
-	exp.router.RegisterRoute("GET", 1, exp.GetRecordsFromTable)
-	exp.router.RegisterRoute("GET", 2, exp.GetRecordByID)
-	exp.router.RegisterRoute("PUT", 1, exp.CreateRecord)
-	exp.router.RegisterRoute("POST", 2, exp.UpdateRecord)
-	exp.router.RegisterRoute("DELETE", 2, exp.DeleteRecord)
+func declareRoutes(exp *dBExplorer) {
+	exp.router.RegisterRoute("GET", 0, exp.getAllTables)
+	exp.router.RegisterRoute("GET", 1, exp.getRecordsFromTable)
+	exp.router.RegisterRoute("GET", 2, exp.getRecordByID)
+	exp.router.RegisterRoute("PUT", 1, exp.createRecord)
+	exp.router.RegisterRoute("POST", 2, exp.updateRecord)
+	exp.router.RegisterRoute("DELETE", 2, exp.deleteRecord)
 }
 
-func (exp *DBExplorer) GetAllTables(w http.ResponseWriter, r *http.Request) {
+func (exp *dBExplorer) getAllTables(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeResponseJSON(w, http.StatusMethodNotAllowed, "", nil, "bad method")
 		return
@@ -44,7 +44,7 @@ func (exp *DBExplorer) GetAllTables(w http.ResponseWriter, r *http.Request) {
 	writeResponseJSON(w, http.StatusOK, "tables", resp, "")
 }
 
-func (exp *DBExplorer) GetRecordsFromTable(w http.ResponseWriter, r *http.Request) {
+func (exp *dBExplorer) getRecordsFromTable(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeResponseJSON(w, http.StatusMethodNotAllowed, "", nil, "bad method")
 		return
@@ -76,7 +76,7 @@ func (exp *DBExplorer) GetRecordsFromTable(w http.ResponseWriter, r *http.Reques
 	writeResponseJSON(w, http.StatusOK, "records", resp, "")
 }
 
-func (exp *DBExplorer) GetRecordByID(w http.ResponseWriter, r *http.Request) {
+func (exp *dBExplorer) getRecordByID(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeResponseJSON(w, http.StatusMethodNotAllowed, "", nil, "bad method")
 		return
@@ -115,7 +115,7 @@ func (exp *DBExplorer) GetRecordByID(w http.ResponseWriter, r *http.Request) {
 	writeResponseJSON(w, http.StatusOK, "record", resp[0], "")
 }
 
-func (exp *DBExplorer) CreateRecord(w http.ResponseWriter, r *http.Request) {
+func (exp *dBExplorer) createRecord(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
 		writeResponseJSON(w, http.StatusMethodNotAllowed, "", nil, "bad method")
 		return
@@ -135,16 +135,16 @@ func (exp *DBExplorer) CreateRecord(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	lastID, err := exp.insert(data, table.Columns, tableName)
+	lastID, err := exp.insert(data, table.columns, tableName)
 	if err != nil {
 		writeResponseJSON(w, http.StatusInternalServerError, "", nil, err.Error())
 		return
 	}
 
-	writeResponseJSON(w, http.StatusOK, table.Columns[0].Field, lastID, "")
+	writeResponseJSON(w, http.StatusOK, table.columns[0].field, lastID, "")
 }
 
-func (exp *DBExplorer) DeleteRecord(w http.ResponseWriter, r *http.Request) {
+func (exp *dBExplorer) deleteRecord(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		writeResponseJSON(w, http.StatusMethodNotAllowed, "", nil, "bad method")
 		return
@@ -178,7 +178,7 @@ func (exp *DBExplorer) DeleteRecord(w http.ResponseWriter, r *http.Request) {
 	writeResponseJSON(w, http.StatusOK, "deleted", rowsAffected, "")
 }
 
-func (exp *DBExplorer) UpdateRecord(w http.ResponseWriter, r *http.Request) {
+func (exp *dBExplorer) updateRecord(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeResponseJSON(w, http.StatusMethodNotAllowed, "", nil, "bad method")
 		return
@@ -216,7 +216,7 @@ func (exp *DBExplorer) UpdateRecord(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rowsAffected, err := exp.update(id, data, table.Columns, tableName)
+	rowsAffected, err := exp.update(id, data, table.columns, tableName)
 	if err != nil {
 		writeResponseJSON(w, http.StatusInternalServerError, "", nil, err.Error())
 		return

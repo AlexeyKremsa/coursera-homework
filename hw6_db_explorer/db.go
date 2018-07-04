@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func (exp *DBExplorer) ExecuteQuery(query string, colNames []string) ([]map[string]interface{}, error) {
+func (exp *dBExplorer) executeQuery(query string, colNames []string) ([]map[string]interface{}, error) {
 	rows, err := exp.db.Query(query)
 	if err != nil {
 		return nil, err
@@ -47,17 +47,17 @@ func (exp *DBExplorer) ExecuteQuery(query string, colNames []string) ([]map[stri
 	return resp, nil
 }
 
-func (exp *DBExplorer) insert(data map[string]interface{}, columns []*ColumnInfo, tableName string) (int64, error) {
+func (exp *dBExplorer) insert(data map[string]interface{}, columns []*columnInfo, tableName string) (int64, error) {
 	colNames := make([]string, 0)
 	values := make([]interface{}, 0)
 
 	// skip 1st element, normally it`s an id
 	for i := 1; i < len(columns); i++ {
-		colNames = append(colNames, columns[i].Field)
+		colNames = append(colNames, columns[i].field)
 
-		val, ok := data[columns[i].Field]
+		val, ok := data[columns[i].field]
 		if !ok {
-			if columns[i].Null {
+			if columns[i].isNull {
 				val = nil
 			} else {
 				val = ""
@@ -78,7 +78,7 @@ func (exp *DBExplorer) insert(data map[string]interface{}, columns []*ColumnInfo
 	return res.LastInsertId()
 }
 
-func (exp *DBExplorer) update(id int, data map[string]interface{}, columns []*ColumnInfo, tableName string) (int64, error) {
+func (exp *dBExplorer) update(id int, data map[string]interface{}, columns []*columnInfo, tableName string) (int64, error) {
 	setStmts := make([]string, 0)
 	values := make([]interface{}, 0)
 
@@ -87,7 +87,7 @@ func (exp *DBExplorer) update(id int, data map[string]interface{}, columns []*Co
 		values = append(values, v)
 	}
 
-	query := fmt.Sprintf("UPDATE %s SET %s WHERE %s = %d", tableName, strings.Join(setStmts, ", "), columns[0].Field, id)
+	query := fmt.Sprintf("UPDATE %s SET %s WHERE %s = %d", tableName, strings.Join(setStmts, ", "), columns[0].field, id)
 	fmt.Println(query)
 	res, err := exp.db.Exec(query, values...)
 	if err != nil {
@@ -97,37 +97,37 @@ func (exp *DBExplorer) update(id int, data map[string]interface{}, columns []*Co
 	return res.RowsAffected()
 }
 
-func (exp *DBExplorer) getAll(limit, offset int64, table *Table) ([]map[string]interface{}, error) {
+func (exp *dBExplorer) getAll(limit, offset int64, table *tableInfo) ([]map[string]interface{}, error) {
 	// select all columns
 	colNames := make([]string, 0)
-	for _, col := range table.Columns {
-		colNames = append(colNames, col.Field)
+	for _, col := range table.columns {
+		colNames = append(colNames, col.field)
 	}
 	columns := strings.Join(colNames, ", ")
 
-	query := fmt.Sprintf(`SELECT %s FROM %s LIMIT %d OFFSET %d`, columns, table.Name, limit, offset)
-	resp, err := exp.ExecuteQuery(query, colNames)
+	query := fmt.Sprintf(`SELECT %s FROM %s LIMIT %d OFFSET %d`, columns, table.name, limit, offset)
+	resp, err := exp.executeQuery(query, colNames)
 
 	return resp, err
 }
 
-func (exp *DBExplorer) getByID(id int, table *Table) ([]map[string]interface{}, error) {
+func (exp *dBExplorer) getByID(id int, table *tableInfo) ([]map[string]interface{}, error) {
 	// select all columns
 	colNames := make([]string, 0)
-	for _, col := range table.Columns {
-		colNames = append(colNames, col.Field)
+	for _, col := range table.columns {
+		colNames = append(colNames, col.field)
 	}
 	columns := strings.Join(colNames, ", ")
 
-	query := fmt.Sprintf(`SELECT %s FROM %s WHERE %s = %d`, columns, table.Name, table.Columns[0].Field, id)
+	query := fmt.Sprintf(`SELECT %s FROM %s WHERE %s = %d`, columns, table.name, table.columns[0].field, id)
 
-	resp, err := exp.ExecuteQuery(query, colNames)
+	resp, err := exp.executeQuery(query, colNames)
 
 	return resp, err
 }
 
-func (exp *DBExplorer) delete(id int, table *Table) (int64, error) {
-	query := fmt.Sprintf("DELETE FROM %s WHERE %s = ?", table.Name, table.Columns[0].Field)
+func (exp *dBExplorer) delete(id int, table *tableInfo) (int64, error) {
+	query := fmt.Sprintf("DELETE FROM %s WHERE %s = ?", table.name, table.columns[0].field)
 
 	res, err := exp.db.Exec(query, id)
 	if err != nil {
