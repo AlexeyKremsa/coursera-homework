@@ -1,7 +1,8 @@
 package main
 
 import (
-	"fmt"
+	"encoding/json"
+	"strings"
 
 	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -15,27 +16,58 @@ const (
 	logger   = "logger"
 )
 
-func checkBizPermission(ctx context.Context, rolesAllowed ...string) error {
-	var found bool
+func getConsumerNameFromContext(ctx context.Context) (string, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return grpc.Errorf(codes.Unauthenticated, "can not get metadata")
+		return "", grpc.Errorf(codes.Unauthenticated, "can not get metadata")
+	}
+	consumer, ok := md["consumer"]
+	if !ok || len(consumer) != 1 {
+		return "", grpc.Errorf(codes.Unauthenticated, "can not get metadata")
 	}
 
-	for _, role := range rolesAllowed {
-		val, ok := md["consumer"]
-		fmt.Print(role)
-		if !ok || len(val) != 1 || val[0] != role {
-			continue
-		} else {
-			found = true
-			break
-		}
-	}
+	return consumer[0], nil
+}
 
-	if !found {
+func (srv *service) checkBizPermission(consumer, method string) error {
+	allowedMethods, ok := srv.aclStorage[consumer]
+	if !ok {
 		return grpc.Errorf(codes.Unauthenticated, "permission denied")
 	}
 
-	return nil
+	for _, m := range allowedMethods {
+		//check if everything allowed
+		splitted := strings.Split(m, "/")
+		if len(splitted) == 3 && splitted[2] == "*" {
+			return nil
+		}
+
+		if m == method {
+			return nil
+		}
+	}
+
+	return grpc.Errorf(codes.Unauthenticated, "permission denied")
+}
+
+func parseACL(acl string) (map[string][]string, error) {
+	var aclParsed map[string]*json.RawMessage
+	result := make(map[string][]string)
+
+	err := json.Unmarshal([]byte(acl), &aclParsed)
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range aclParsed {
+		var val []string
+		err := json.Unmarshal(*v, &val)
+		if err != nil {
+			return nil, err
+		}
+
+		result[k] = val
+	}
+
+	return result, nil
 }

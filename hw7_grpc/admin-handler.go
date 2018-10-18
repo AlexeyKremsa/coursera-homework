@@ -1,30 +1,46 @@
 package main
 
-type adminHandler struct {
-}
-
-func newAdminHandler() *adminHandler {
-	return &adminHandler{}
-}
-
-func (a *adminHandler) Logging(nothing *Nothing, srv Admin_LoggingServer) error {
-	err := checkBizPermission(srv.Context(), bizAdmin, logger)
+func (s *service) Logging(nothing *Nothing, srv Admin_LoggingServer) error {
+	consumer, err := getConsumerNameFromContext(srv.Context())
 	if err != nil {
 		return err
 	}
 
-	methodName := "/main.Admin/Logging"
-	event := Event{
-		Host:     "",
-		Method:   methodName,
-		Consumer: "test consumer",
+	err = s.checkBizPermission(consumer, "/main.Admin/Logging")
+	if err != nil {
+		return err
 	}
-	event.ProtoMessage()
-	srv.Send(&event)
 
-	return nil
+	listener := listener{
+		logsCh:  make(chan *logMsg),
+		closeCh: make(chan struct{}),
+	}
+	s.addListener(&listener)
+
+	current := &Event{
+		Consumer: consumer,
+		Method:   "/main.Admin/Logging",
+		Host:     "127.0.0.1:8083",
+	}
+
+	srv.Send(current)
+
+	for {
+		select {
+		case logMsg := <-listener.logsCh:
+			event := &Event{
+				Consumer: logMsg.consumerName,
+				Method:   logMsg.methodName,
+				Host:     "127.0.0.1:8083",
+			}
+			srv.Send(event)
+
+		case <-listener.closeCh:
+			return nil
+		}
+	}
 }
 
-func (a adminHandler) Statistics(*StatInterval, Admin_StatisticsServer) error {
+func (s *service) Statistics(*StatInterval, Admin_StatisticsServer) error {
 	return nil
 }

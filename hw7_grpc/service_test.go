@@ -174,6 +174,7 @@ func TestLogging(t *testing.T) {
 	}
 	wait(1)
 	defer func() {
+		fmt.Println("BEFORE FINISH")
 		finish()
 		wait(1)
 	}()
@@ -251,9 +252,8 @@ func TestLogging(t *testing.T) {
 
 	biz.Test(getConsumerCtx("biz_admin"), &Nothing{})
 	time.Sleep(2 * time.Millisecond)
-
 	wg.Wait()
-
+	fmt.Println("BEFORE CHECKS")
 	expectedLogData1 := []*Event{
 		{Timestamp: 0, Consumer: "logger", Method: "/main.Admin/Logging", Host: ""},
 		{Timestamp: 0, Consumer: "biz_user", Method: "/main.Biz/Check", Host: ""},
