@@ -18,6 +18,13 @@ type service struct {
 	closeListenersCh chan struct{}
 	listeners        []*listener
 	aclStorage       map[string][]string
+	stat             stat
+}
+
+type stat struct {
+	methods        map[string]uint64
+	consumers      map[string]uint64
+	consumersClose []chan struct{}
 }
 
 type listener struct {
@@ -28,30 +35,6 @@ type listener struct {
 type logMsg struct {
 	methodName   string
 	consumerName string
-}
-
-func (srv *service) addListener(l *listener) {
-	srv.m.Lock()
-	srv.listeners = append(srv.listeners, l)
-	srv.m.Unlock()
-}
-
-func (srv *service) logsSender() {
-	for {
-		select {
-		case log := <-srv.incomingLogsCh:
-			for _, l := range srv.listeners {
-				l.logsCh <- log
-			}
-
-		case <-srv.closeListenersCh:
-			for _, l := range srv.listeners {
-				l.closeCh <- struct{}{}
-			}
-
-			return
-		}
-	}
 }
 
 func StartMyMicroservice(ctx context.Context, addr, acl string) error {
@@ -71,6 +54,11 @@ func StartMyMicroservice(ctx context.Context, addr, acl string) error {
 		listeners:        make([]*listener, 0),
 		aclStorage:       aclParsed,
 		closeListenersCh: make(chan struct{}),
+		stat: stat{
+			methods:        make(map[string]uint64),
+			consumers:      make(map[string]uint64),
+			consumersClose: make([]chan struct{}, 0),
+		},
 	}
 
 	go service.logsSender()

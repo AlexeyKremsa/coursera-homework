@@ -304,12 +304,12 @@ func TestStat(t *testing.T) {
 		for {
 			stat, err := statStream1.Recv()
 			if err != nil && err != io.EOF {
-				// fmt.Printf("unexpected error %v\n", err)
+				fmt.Printf("unexpected error %v\n", err)
 				return
 			} else if err == io.EOF {
 				break
 			}
-			// log.Println("stat1", stat, err)
+			log.Println("stat1", stat, err)
 			mu.Lock()
 			stat1 = stat
 			stat1.Timestamp = 0
@@ -320,12 +320,12 @@ func TestStat(t *testing.T) {
 		for {
 			stat, err := statStream2.Recv()
 			if err != nil && err != io.EOF {
-				// fmt.Printf("unexpected error %v\n", err)
+				fmt.Printf("unexpected error %v\n", err)
 				return
 			} else if err == io.EOF {
 				break
 			}
-			// log.Println("stat2", stat, err)
+			log.Println("stat2", stat, err)
 			mu.Lock()
 			stat2 = stat
 			stat2.Timestamp = 0

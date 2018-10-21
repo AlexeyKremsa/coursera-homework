@@ -71,3 +71,55 @@ func parseACL(acl string) (map[string][]string, error) {
 
 	return result, nil
 }
+
+func (srv *service) addListener(l *listener) {
+	srv.m.Lock()
+	srv.listeners = append(srv.listeners, l)
+	srv.m.Unlock()
+}
+
+func (srv *service) logsSender() {
+	for {
+		select {
+		case log := <-srv.incomingLogsCh:
+			for _, l := range srv.listeners {
+				l.logsCh <- log
+			}
+
+		case <-srv.closeListenersCh:
+			for _, l := range srv.listeners {
+				l.closeCh <- struct{}{}
+			}
+
+			return
+		}
+	}
+}
+
+func (srv *service) addMethodStat(name string) {
+	srv.m.Lock()
+	res, ok := srv.stat.method[name]
+	if !ok {
+		srv.stat.method[name] = 0
+	} else {
+		res++
+		srv.stat.method[name] = res
+	}
+}
+
+func (srv *service) addConsumerStat(name string) {
+	srv.m.Lock()
+	res, ok := srv.stat.consumer[name]
+	if !ok {
+		srv.stat.consumer[name] = 0
+	} else {
+		res++
+		srv.stat.consumer[name] = res
+	}
+}
+
+func (srv *service) addStatCloseCh(closeCh chan struct{}) {
+	srv.m.Lock()
+	srv.stat.consumersClose = append(srv.stat.consumersClose, closeCh)
+	srv.m.Unlock()
+}
