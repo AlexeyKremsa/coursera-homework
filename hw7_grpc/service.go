@@ -40,13 +40,11 @@ func (srv *service) logsSender() {
 	for {
 		select {
 		case log := <-srv.incomingLogsCh:
-			fmt.Println("Got: ", log)
 			for _, l := range srv.listeners {
 				l.logsCh <- log
 			}
 
 		case <-srv.closeListenersCh:
-			fmt.Println("CLOSE LISTENERS")
 			for _, l := range srv.listeners {
 				l.closeCh <- struct{}{}
 			}
@@ -89,7 +87,6 @@ func StartMyMicroservice(ctx context.Context, addr, acl string) error {
 	go func() {
 		select {
 		case <-ctx.Done():
-			fmt.Println("CLOSE SERVER")
 			service.closeListenersCh <- struct{}{}
 			srv.Stop()
 			return
@@ -137,6 +134,27 @@ func (s *service) streamInterceptor(srv interface{},
 	ss grpc.ServerStream,
 	info *grpc.StreamServerInfo,
 	handler grpc.StreamHandler) error {
-	fmt.Println("OLO")
+
+	consumer, err := getConsumerNameFromContext(ss.Context())
+	if err != nil {
+		return err
+	}
+
+	err = s.checkBizPermission(consumer, "/main.Admin/Logging")
+	if err != nil {
+		return err
+	}
+
+	msg := logMsg{
+		consumerName: consumer,
+		methodName:   info.FullMethod,
+	}
+
+	s.m.Lock()
+	for _, l := range s.listeners {
+		l.logsCh <- &msg
+	}
+	s.m.Unlock()
+
 	return handler(srv, ss)
 }
