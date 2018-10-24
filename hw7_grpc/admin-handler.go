@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -31,23 +32,22 @@ func (s *service) Logging(nothing *Nothing, srv Admin_LoggingServer) error {
 func (s *service) Statistics(interval *StatInterval, srv Admin_StatisticsServer) error {
 
 	closeCh := make(chan struct{})
-	s.addStatCloseCh(closeCh)
 
 	ticker := time.NewTicker(time.Second * time.Duration(interval.IntervalSeconds))
+
+	sl := statListener{
+		statCh:  make(chan *statMsg, 0),
+		closeCh: make(chan struct{}, 0),
+	}
+
+	s.addStatListener(&sl)
+
+	c := make(map[string]uint64)
+	m := make(map[string]uint64)
 
 	for {
 		select {
 		case <-ticker.C:
-			c := make(map[string]uint64)
-			m := make(map[string]uint64)
-
-			for k := range s.stat.consumers {
-				c[k] = s.stat.consumers[k]
-			}
-
-			for k := range s.stat.methods {
-				m[k] = s.stat.methods[k]
-			}
 			statEvent := &Stat{
 				Timestamp:  0,
 				ByMethod:   m,
@@ -56,7 +56,26 @@ func (s *service) Statistics(interval *StatInterval, srv Admin_StatisticsServer)
 
 			srv.Send(statEvent)
 
+			c = make(map[string]uint64)
+			m = make(map[string]uint64)
+
+		case statMsg := <-sl.statCh:
+			_, ok := c[statMsg.consumerName]
+			if !ok {
+				c[statMsg.consumerName] = 1
+			} else {
+				c[statMsg.consumerName]++
+			}
+
+			_, ok = m[statMsg.methodName]
+			if !ok {
+				m[statMsg.methodName] = 1
+			} else {
+				m[statMsg.methodName]++
+			}
+
 		case <-closeCh:
+			fmt.Println("CLOSED")
 			return nil
 		}
 	}

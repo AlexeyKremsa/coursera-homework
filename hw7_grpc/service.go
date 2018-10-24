@@ -13,18 +13,19 @@ import (
 var aclStorage map[string]json.RawMessage
 
 type service struct {
-	m                *sync.RWMutex
-	incomingLogsCh   chan *logMsg
-	closeListenersCh chan struct{}
-	listeners        []*listener
-	aclStorage       map[string][]string
-	stat             stat
+	m                    *sync.RWMutex
+	incomingLogsCh       chan *logMsg
+	closeListenersCh     chan struct{}
+	listeners            []*listener
+	aclStorage           map[string][]string
+	statListeners        []*statListener
+	incomingStatCh       chan *statMsg
+	closeStatListenersCh chan struct{}
 }
 
-type stat struct {
-	methods        map[string]uint64
-	consumers      map[string]uint64
-	consumersClose []chan struct{}
+type logMsg struct {
+	methodName   string
+	consumerName string
 }
 
 type listener struct {
@@ -32,9 +33,14 @@ type listener struct {
 	closeCh chan struct{}
 }
 
-type logMsg struct {
+type statMsg struct {
 	methodName   string
 	consumerName string
+}
+
+type statListener struct {
+	statCh  chan *statMsg
+	closeCh chan struct{}
 }
 
 func StartMyMicroservice(ctx context.Context, addr, acl string) error {
@@ -49,19 +55,18 @@ func StartMyMicroservice(ctx context.Context, addr, acl string) error {
 	}
 
 	service := &service{
-		m:                &sync.RWMutex{},
-		incomingLogsCh:   make(chan *logMsg, 0),
-		listeners:        make([]*listener, 0),
-		aclStorage:       aclParsed,
-		closeListenersCh: make(chan struct{}),
-		stat: stat{
-			methods:        make(map[string]uint64),
-			consumers:      make(map[string]uint64),
-			consumersClose: make([]chan struct{}, 0),
-		},
+		m:                    &sync.RWMutex{},
+		incomingLogsCh:       make(chan *logMsg, 0),
+		listeners:            make([]*listener, 0),
+		aclStorage:           aclParsed,
+		closeListenersCh:     make(chan struct{}),
+		statListeners:        make([]*statListener, 0),
+		incomingStatCh:       make(chan *statMsg, 0),
+		closeStatListenersCh: make(chan struct{}),
 	}
 
 	go service.logsSender()
+	go service.statsSender()
 
 	opts := []grpc.ServerOption{grpc.UnaryInterceptor(service.unaryInterceptor),
 		grpc.StreamInterceptor(service.streamInterceptor)}
@@ -76,6 +81,9 @@ func StartMyMicroservice(ctx context.Context, addr, acl string) error {
 		select {
 		case <-ctx.Done():
 			service.closeListenersCh <- struct{}{}
+
+			service.closeStatListenersCh <- struct{}{}
+
 			srv.Stop()
 			return
 		}
@@ -96,7 +104,7 @@ func (s *service) unaryInterceptor(ctx context.Context,
 	req interface{},
 	info *grpc.UnaryServerInfo,
 	handler grpc.UnaryHandler) (interface{}, error) {
-
+	fmt.Println("GGG")
 	consumer, err := getConsumerNameFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -107,12 +115,19 @@ func (s *service) unaryInterceptor(ctx context.Context,
 		return nil, err
 	}
 
-	msg := logMsg{
+	logMsg := logMsg{
 		consumerName: consumer,
 		methodName:   info.FullMethod,
 	}
 
-	s.incomingLogsCh <- &msg
+	s.incomingLogsCh <- &logMsg
+
+	statMsg := statMsg{
+		consumerName: consumer,
+		methodName:   info.FullMethod,
+	}
+
+	s.incomingStatCh <- &statMsg
 
 	h, err := handler(ctx, req)
 	return h, err
@@ -122,27 +137,37 @@ func (s *service) streamInterceptor(srv interface{},
 	ss grpc.ServerStream,
 	info *grpc.StreamServerInfo,
 	handler grpc.StreamHandler) error {
-
 	consumer, err := getConsumerNameFromContext(ss.Context())
 	if err != nil {
 		return err
 	}
 
-	err = s.checkBizPermission(consumer, "/main.Admin/Logging")
+	err = s.checkBizPermission(consumer, info.FullMethod)
 	if err != nil {
 		return err
 	}
 
-	msg := logMsg{
-		consumerName: consumer,
-		methodName:   info.FullMethod,
-	}
+	if info.FullMethod == "/main.Admin/Logging" {
+		msg := logMsg{
+			consumerName: consumer,
+			methodName:   info.FullMethod,
+		}
 
-	s.m.Lock()
-	for _, l := range s.listeners {
-		l.logsCh <- &msg
+		for _, l := range s.listeners {
+			l.logsCh <- &msg
+		}
+
+	} else {
+		msg := statMsg{
+			consumerName: consumer,
+			methodName:   info.FullMethod,
+		}
+
+		for _, l := range s.statListeners {
+			l.statCh <- &msg
+		}
+
 	}
-	s.m.Unlock()
 
 	return handler(srv, ss)
 }

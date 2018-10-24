@@ -96,30 +96,26 @@ func (srv *service) logsSender() {
 	}
 }
 
-func (srv *service) addMethodStat(name string) {
-	srv.m.Lock()
-	res, ok := srv.stat.method[name]
-	if !ok {
-		srv.stat.method[name] = 0
-	} else {
-		res++
-		srv.stat.method[name] = res
+func (srv *service) statsSender() {
+	for {
+		select {
+		case statMsg := <-srv.incomingStatCh:
+			for _, l := range srv.statListeners {
+				l.statCh <- statMsg
+			}
+
+		case <-srv.closeStatListenersCh:
+			for _, l := range srv.statListeners {
+				l.closeCh <- struct{}{}
+			}
+
+			return
+		}
 	}
 }
 
-func (srv *service) addConsumerStat(name string) {
+func (srv *service) addStatListener(sl *statListener) {
 	srv.m.Lock()
-	res, ok := srv.stat.consumer[name]
-	if !ok {
-		srv.stat.consumer[name] = 0
-	} else {
-		res++
-		srv.stat.consumer[name] = res
-	}
-}
-
-func (srv *service) addStatCloseCh(closeCh chan struct{}) {
-	srv.m.Lock()
-	srv.stat.consumersClose = append(srv.stat.consumersClose, closeCh)
+	srv.statListeners = append(srv.statListeners, sl)
 	srv.m.Unlock()
 }

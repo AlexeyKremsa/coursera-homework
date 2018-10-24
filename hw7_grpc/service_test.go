@@ -307,6 +307,7 @@ func TestStat(t *testing.T) {
 				fmt.Printf("unexpected error %v\n", err)
 				return
 			} else if err == io.EOF {
+				//wg.Done()
 				break
 			}
 			log.Println("stat1", stat, err)
@@ -323,6 +324,7 @@ func TestStat(t *testing.T) {
 				fmt.Printf("unexpected error %v\n", err)
 				return
 			} else if err == io.EOF {
+				//wg.Done()
 				break
 			}
 			log.Println("stat2", stat, err)
@@ -340,7 +342,7 @@ func TestStat(t *testing.T) {
 	biz.Test(getConsumerCtx("biz_admin"), &Nothing{})
 
 	wait(200) // 2 sec
-
+	//wg.Wait()
 	expectedStat1 := &Stat{
 		Timestamp: 0,
 		ByMethod: map[string]uint64{
