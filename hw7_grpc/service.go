@@ -104,7 +104,6 @@ func (s *service) unaryInterceptor(ctx context.Context,
 	req interface{},
 	info *grpc.UnaryServerInfo,
 	handler grpc.UnaryHandler) (interface{}, error) {
-	fmt.Println("GGG")
 	consumer, err := getConsumerNameFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -152,10 +151,11 @@ func (s *service) streamInterceptor(srv interface{},
 			consumerName: consumer,
 			methodName:   info.FullMethod,
 		}
-
+		s.m.RLock()
 		for _, l := range s.listeners {
 			l.logsCh <- &msg
 		}
+		s.m.RUnlock()
 
 	} else {
 		msg := statMsg{
@@ -163,9 +163,11 @@ func (s *service) streamInterceptor(srv interface{},
 			methodName:   info.FullMethod,
 		}
 
+		s.m.RLock()
 		for _, l := range s.statListeners {
 			l.statCh <- &msg
 		}
+		s.m.RUnlock()
 
 	}
 

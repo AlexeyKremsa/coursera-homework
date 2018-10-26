@@ -82,14 +82,18 @@ func (srv *service) logsSender() {
 	for {
 		select {
 		case log := <-srv.incomingLogsCh:
+			srv.m.RLock()
 			for _, l := range srv.listeners {
 				l.logsCh <- log
 			}
+			srv.m.RUnlock()
 
 		case <-srv.closeListenersCh:
+			srv.m.RLock()
 			for _, l := range srv.listeners {
 				l.closeCh <- struct{}{}
 			}
+			srv.m.RUnlock()
 
 			return
 		}
@@ -100,15 +104,18 @@ func (srv *service) statsSender() {
 	for {
 		select {
 		case statMsg := <-srv.incomingStatCh:
+			srv.m.RLock()
 			for _, l := range srv.statListeners {
 				l.statCh <- statMsg
 			}
+			srv.m.RUnlock()
 
 		case <-srv.closeStatListenersCh:
+			srv.m.RLock()
 			for _, l := range srv.statListeners {
 				l.closeCh <- struct{}{}
 			}
-
+			srv.m.RUnlock()
 			return
 		}
 	}
