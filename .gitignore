@@ -17,3 +17,5 @@ hw6_db_explorer/hw6_db_explorer
 hw6_db_explorer/.vscode/launch.json
 hw6_db_explorer/debug
 hw7_grpc/debug.test
+
+hw8_i2s/debug\.test
