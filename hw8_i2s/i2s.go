@@ -7,11 +7,12 @@ import (
 )
 
 func i2s(data interface{}, out interface{}) error {
+	fmt.Println(reflect.TypeOf(out))
 	v := reflect.ValueOf(data)
 
 	vOut := reflect.ValueOf(out)
 	vOut = vOut.Elem()
-	fmt.Println("KIND: ", v.Kind())
+	//fmt.Println("KIND: ", v.Kind())
 	if v.Kind() == reflect.Map {
 		for _, key := range v.MapKeys() {
 			fieldVal := v.MapIndex(key)
@@ -19,13 +20,16 @@ func i2s(data interface{}, out interface{}) error {
 
 			fOut := vOut.FieldByName(key.String())
 
-			fmt.Println("STRUCT???: ", reflect.TypeOf(fieldVal.Interface()).Kind())
-			//TODO: THIS IS A MAP
 			switch reflect.TypeOf(fieldVal.Interface()).Kind() {
+			case reflect.Map:
+				outVal := reflect.New(fOut.Type()).Elem()
+				i2s(fieldVal.Interface(), outVal.Addr().Interface())
+				fOut.Set(outVal)
+
 			case reflect.Float64:
 				castVal, ok := fieldVal.Interface().(float64)
 				if !ok {
-					return errors.New("can not cast to int64")
+					return errors.New("can not cast to float64")
 				}
 				fOut.SetInt(int64(castVal))
 
@@ -40,7 +44,6 @@ func i2s(data interface{}, out interface{}) error {
 				outSlice := reflect.MakeSlice(fOut.Type(), sliceItself.Len(), sliceItself.Len())
 				fmt.Println(reflect.TypeOf(outSlice), fOut.Type())
 				for i := 0; i < sliceItself.Len(); i++ {
-					fmt.Println("Itself: ", sliceItself.Index(i).Interface())
 					i2s(sliceItself.Index(i).Interface(), outSlice.Index(i).Addr().Interface())
 				}
 				fmt.Println("RES: ", outSlice)
