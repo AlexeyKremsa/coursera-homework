@@ -12,12 +12,20 @@ func i2s(data interface{}, out interface{}) error {
 
 	vOut := reflect.ValueOf(out)
 	vOut = vOut.Elem()
-	//fmt.Println("KIND: ", v.Kind())
+	if v.Kind() == reflect.Slice {
+		sliceItself := reflect.ValueOf(v.Interface())
+		outSlice := reflect.MakeSlice(vOut.Type(), sliceItself.Len(), sliceItself.Len())
+		for i := 0; i < v.Len(); i++ {
+			i2s(sliceItself.Index(i).Interface(), outSlice.Index(i).Addr().Interface())
+		}
+		vOut.Set(outSlice)
+
+	}
+
 	if v.Kind() == reflect.Map {
 		for _, key := range v.MapKeys() {
 			fieldVal := v.MapIndex(key)
 			fmt.Println("===", key.Interface(), fieldVal.Interface(), reflect.TypeOf(fieldVal.Interface()))
-
 			fOut := vOut.FieldByName(key.String())
 
 			switch reflect.TypeOf(fieldVal.Interface()).Kind() {
@@ -42,12 +50,9 @@ func i2s(data interface{}, out interface{}) error {
 			case reflect.Slice:
 				sliceItself := reflect.ValueOf(fieldVal.Interface())
 				outSlice := reflect.MakeSlice(fOut.Type(), sliceItself.Len(), sliceItself.Len())
-				fmt.Println(reflect.TypeOf(outSlice), fOut.Type())
 				for i := 0; i < sliceItself.Len(); i++ {
 					i2s(sliceItself.Index(i).Interface(), outSlice.Index(i).Addr().Interface())
 				}
-				fmt.Println("RES: ", outSlice)
-				fmt.Println(reflect.TypeOf(fOut))
 				fOut.Set(outSlice)
 			}
 		}
